@@ -34,7 +34,7 @@ Currently beanstalkd is tested with GCC and clang, but it should work
 with any compiler that supports C99.
 
 Uses ronn to generate the manual.
-See http://github.com/rtomayko/ronn.
+See <http://github.com/rtomayko/ronn>.
 
 ## Docker
 
@@ -72,10 +72,10 @@ docker run -p 11300:11300 --restart=always --name beanstalkd \
 ## Subdirectories
 
 - `adm` - files useful for system administrators
-- `ct` - testing tool; vendored from https://github.com/kr/ct
+- `ct` - testing tool; vendored from <https://github.com/kr/ct>
 - `doc` - documentation
 
 ## Tests
 
-Unit tests are in test*.c. See https://github.com/kr/ct for
+Unit tests are in test*.c. See <https://github.com/kr/ct> for
 information on how to write them.
