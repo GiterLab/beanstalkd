@@ -71,29 +71,33 @@ command to delete the job.
 
 Here is a picture of the typical job lifecycle:
 
-    put            reserve               delete
-    -----> [READY] ---------> [RESERVED] --------> *poof*
+```text
+put            reserve               delete
+-----> [READY] ---------> [RESERVED] --------> *poof*
+```
 
 Here is a picture with more possibilities:
 
-    put with delay               release with delay
-    ----------------> [DELAYED] <------------.
-                          |                   |
-                          | (time passes)     |
-                          |                   |
-    put                  v     reserve       |       delete
-    -----------------> [READY] ---------> [RESERVED] --------> *poof*
-                        ^  ^                |  |
-                        |   \  release      |  |
-                        |    `-------------'   |
-                        |                      |
-                        | kick                 |
-                        |                      |
-                        |       bury           |
-                      [BURIED] <---------------'
-                        |
-                        |  delete
-                          `--------> *poof*
+```text
+put with delay               release with delay
+----------------> [DELAYED] <------------.
+                      |                   |
+                      | (time passes)     |
+                      |                   |
+put                  v     reserve       |       delete
+-----------------> [READY] ---------> [RESERVED] --------> *poof*
+                    ^  ^                |  |
+                    |   \  release      |  |
+                    |    `-------------'   |
+                    |                      |
+                    | kick                 |
+                    |                      |
+                    |       bury           |
+                  [BURIED] <---------------'
+                    |
+                    |  delete
+                      `--------> *poof*
+```
 
 The system has one or more tubes. Each tube consists of a ready queue and a
 delay queue. Each job spends its entire life in one tube. Consumers can show
@@ -115,7 +119,9 @@ to it, it will be deleted.
 The "auth" command is used to authenticate a client connection. It is sent before any other commands
 and must be the first command sent by the client. The command looks like this:
 
-    auth <password>\r\n
+```text
+auth <password>\r\n
+```
 
 - `<password>` is a string that is used to authenticate the client. The server will
    check this password against its configured authentication method.
@@ -131,8 +137,10 @@ There are two possible responses:
 The "put" command is for any process that wants to insert a job into the queue.
 It comprises a command line followed by the job body:
 
-    put <pri> <delay> <ttr> <bytes>\r\n
-    <data>\r\n
+```text
+put <pri> <delay> <ttr> <bytes>\r\n
+<data>\r\n
+```
 
 It inserts a job into the client's currently used tube (see the "use" command
 below).
@@ -186,14 +194,18 @@ The "use" command is for producers. Subsequent put commands will put jobs into
 the tube specified by this command. If no use command has been issued, jobs
 will be put into the tube named "default".
 
-    use <tube>\r\n
+```text
+use <tube>\r\n
+```
 
 - `<tube>` is a name at most 200 bytes. It specifies the tube to use. If the
    tube does not exist, it will be created.
 
 The only reply is:
 
-    USING <tube>\r\n
+```text
+USING <tube>\r\n
+```
 
 - `<tube>` is the name of the tube now being used.
 
@@ -202,11 +214,15 @@ The only reply is:
 A process that wants to consume jobs from the queue uses "reserve", "delete",
 "release", and "bury". The first worker command, "reserve", looks like this:
 
-    reserve\r\n
+```text
+reserve\r\n
+```
 
 Alternatively, you can specify a timeout as follows:
 
-    reserve-with-timeout <seconds>\r\n
+```text
+reserve-with-timeout <seconds>\r\n
+```
 
 This will return a newly-reserved job. If no job is available to be reserved,
 beanstalkd will wait to send a response until one becomes available. Once a
@@ -230,12 +246,16 @@ job. If the client issues a reserve command during the safety margin, or if
 the safety margin arrives while the client is waiting on a reserve command,
 the server will respond with:
 
-    DEADLINE_SOON\r\n
+```text
+DEADLINE_SOON\r\n
+```
 
 This gives the client a chance to delete or release its reserved job before
 the server automatically releases it.
 
-    TIMED_OUT\r\n
+```text
+TIMED_OUT\r\n
+```
 
 If a non-negative timeout was specified and the timeout exceeded before a job
 became available, or if the client's connection is half-closed, the server
@@ -244,8 +264,10 @@ will respond with TIMED_OUT.
 Otherwise, the only other response to this command is a successful reservation
 in the form of a text line followed by the job body:
 
-    RESERVED <id> <bytes>\r\n
-    <data>\r\n
+```text
+RESERVED <id> <bytes>\r\n
+<data>\r\n
+```
 
 - `<id>` is the job id -- an integer unique to this job in this instance of
    beanstalkd.
@@ -262,7 +284,9 @@ the client has limited time to run (TTR) the job before the job times out.
 When the job times out, the server will put the job back into the ready queue.
 The command looks like this:
 
-    reserve-job <id>\r\n
+```text
+reserve-job <id>\r\n
+```
 
 - `<id>` is the job id to reserve
 
@@ -279,7 +303,9 @@ by the client when the job has successfully run to completion. A client can
 delete jobs that it has reserved, ready jobs, delayed jobs, and jobs that are
 buried. The delete command looks like this:
 
-    delete <id>\r\n
+```text
+delete <id>\r\n
+```
 
 - `<id>` is the job id to delete.
 
@@ -295,7 +321,9 @@ The release command puts a reserved job back into the ready queue (and marks
 its state as "ready") to be run by any client. It is normally used when the job
 fails because of a transitory error. It looks like this:
 
-    release <id> <pri> <delay>\r\n
+```text
+release <id> <pri> <delay>\r\n
+```
 
 - `<id>` is the job id to release.
 
@@ -319,7 +347,9 @@ kicks them with the "kick" command.
 
 The bury command looks like this:
 
-    bury <id> <pri>\r\n
+```text
+bury <id> <pri>\r\n
+```
 
 - `<id>` is the job id to bury.
 
@@ -340,7 +370,9 @@ release of a reserved job until TTR seconds from when the command is issued.
 
 The touch command looks like this:
 
-    touch <id>\r\n
+```text
+touch <id>\r\n
+```
 
 - `<id>` is the ID of a job reserved by the current connection.
 
@@ -355,21 +387,27 @@ connection. A reserve command will take a job from any of the tubes in the
 watch list. For each new connection, the watch list initially consists of one
 tube, named "default".
 
-    watch <tube>\r\n
+```text
+watch <tube>\r\n
+```
 
 - `<tube>` is a name at most 200 bytes. It specifies a tube to add to the watch
    list. If the tube doesn't exist, it will be created.
 
 The reply is:
 
-    WATCHING <count>\r\n
+```text
+WATCHING <count>\r\n
+```
 
 - `<count>` is the integer number of tubes currently in the watch list.
 
 The "ignore" command is for consumers. It removes the named tube from the
 watch list for the current connection.
 
-    ignore <tube>\r\n
+```text
+ignore <tube>\r\n
+```
 
 The reply is one of:
 
@@ -400,8 +438,10 @@ There are two possible responses, either a single line:
 
 Or a line followed by a chunk of data, if the command was successful:
 
-    FOUND <id> <bytes>\r\n
-    <data>\r\n
+```text
+FOUND <id> <bytes>\r\n
+<data>\r\n
+```
 
 - `<id>` is the job id.
 
@@ -415,14 +455,18 @@ The kick command applies only to the currently used tube. It moves jobs into
 the ready queue. If there are any buried jobs, it will only kick buried jobs.
 Otherwise it will kick delayed jobs. It looks like:
 
-    kick <bound>\r\n
+```text
+kick <bound>\r\n
+```
 
 - `<bound>` is an integer upper bound on the number of jobs to kick. The server
    will kick no more than \<bound\> jobs.
 
 The response is of the form:
 
-    KICKED <count>\r\n
+```text
+KICKED <count>\r\n
+```
 
 - `<count>` is an integer indicating the number of jobs actually kicked.
 
@@ -431,7 +475,9 @@ identified by its job id. If the given job id exists and is in a buried or
 delayed state, it will be moved to the ready queue of the the same tube where it
 currently belongs. The syntax is:
 
-    kick-job <id>\r\n
+```text
+kick-job <id>\r\n
+```
 
 - `<id>` is the job id to kick.
 
@@ -445,7 +491,9 @@ The response is one of:
 The stats-job command gives statistical information about the specified job if
 it exists. Its form is:
 
-    stats-job <id>\r\n
+```text
+stats-job <id>\r\n
+```
 
 - `<id>` is a job id.
 
@@ -502,7 +550,9 @@ keys to scalar values. It contains these keys:
 The stats-tube command gives statistical information about the specified tube
 if it exists. Its form is:
 
-    stats-tube <tube>\r\n
+```text
+stats-tube <tube>\r\n
+```
 
 - `<tube>` is a name at most 200 bytes. Stats will be returned for this tube.
 
@@ -558,12 +608,16 @@ keys to scalar values. It contains these keys:
 The stats command gives statistical information about the system as a whole.
 Its form is:
 
-    stats\r\n
+```text
+stats\r\n
+```
 
 The server will respond:
 
-    OK <bytes>\r\n
-    <data>\r\n
+```text
+OK <bytes>\r\n
+<data>\r\n
+```
 
 - `<bytes>` is the size of the following data section in bytes.
 
@@ -692,12 +746,16 @@ they are not stored on disk with the -b flag.
 
 The list-tubes command returns a list of all existing tubes. Its form is:
 
-    list-tubes\r\n
+```text
+list-tubes\r\n
+```
 
 The response is:
 
-    OK <bytes>\r\n
-    <data>\r\n
+```text
+OK <bytes>\r\n
+<data>\r\n
+```
 
 - `<bytes>` is the size of the following data section in bytes.
 
@@ -707,23 +765,31 @@ The response is:
 The list-tube-used command returns the tube currently being used by the
 client. Its form is:
 
-    list-tube-used\r\n
+```text
+list-tube-used\r\n
+```
 
 The response is:
 
-    USING <tube>\r\n
+```text
+USING <tube>\r\n
+```
 
 - `<tube>` is the name of the tube being used.
 
 The list-tubes-watched command returns a list tubes currently being watched by
 the client. Its form is:
 
-    list-tubes-watched\r\n
+```text
+list-tubes-watched\r\n
+```
 
 The response is:
 
-    OK <bytes>\r\n
-    <data>\r\n
+```text
+OK <bytes>\r\n
+<data>\r\n
+```
 
 - `<bytes>` is the size of the following data section in bytes.
 
@@ -732,11 +798,15 @@ The response is:
 
 The quit command simply closes the connection. Its form is:
 
-    quit\r\n
+```text
+quit\r\n
+```
 
 The pause-tube command can delay any new job being reserved for a given time. Its form is:
 
-    pause-tube <tube-name> <delay>\r\n
+```text
+pause-tube <tube-name> <delay>\r\n
+```
 
 - `<tube-name>` is the tube to pause
 
