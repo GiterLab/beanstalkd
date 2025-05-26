@@ -45,6 +45,7 @@ All notable changes to this project will be documented in this file.
 - add some basic benchmark tests
 - add DESTDIR support to Makefile
 
+[2.0]:  https://github.com/GiterLab/beanstalkd/compare/v1.13...v2.0
 [1.13]: https://github.com/GiterLab/beanstalkd/compare/v1.12...v1.13
 [1.12]: https://github.com/GiterLab/beanstalkd/compare/v1.11...v1.12
 [1.11]: https://github.com/GiterLab/beanstalkd/compare/v1.10...v1.11
