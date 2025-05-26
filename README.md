@@ -1,13 +1,8 @@
-[![Build Status](https://github.com/beanstalkd/beanstalkd/actions/workflows/build-latest.yaml/badge.svg)](https://github.com/beanstalkd/beanstalkd/actions/workflows/build-latest.yaml)
-[![codecov](https://codecov.io/gh/beanstalkd/beanstalkd/branch/master/graph/badge.svg)](https://codecov.io/gh/beanstalkd/beanstalkd)
-
 # beanstalkd
 
 Simple and fast general purpose work queue.
 
-https://beanstalkd.github.io/
-
-See [doc/protocol.txt](https://github.com/beanstalkd/beanstalkd/blob/master/doc/protocol.txt)
+See [doc/protocol.md](https://github.com/GiterLab/beanstalkd/blob/master/doc/protocol.md)
 for details of the network protocol.
 
 Please note that this project is released with a Contributor
@@ -16,19 +11,22 @@ to abide by its terms. See CodeOfConduct.txt for details.
 
 ## Quick Start
 
-    $ make
-    $ ./beanstalkd
-
+```bash
+make
+./beanstalkd
+```
 
 also try,
 
-    $ ./beanstalkd -h
-    $ ./beanstalkd -VVV
-    $ make CFLAGS=-O2
-    $ make CC=clang
-    $ make check
-    $ make install
-    $ make install PREFIX=/usr
+```bash
+./beanstalkd -h
+./beanstalkd -VVVVV
+make CFLAGS=-O2
+make CC=clang
+make check
+make install
+make install PREFIX=/usr
+```
 
 Requires Linux (2.6.17 or later), Mac OS X, FreeBSD, or Illumos.
 
@@ -38,17 +36,14 @@ with any compiler that supports C99.
 Uses ronn to generate the manual.
 See http://github.com/rtomayko/ronn.
 
-
 ## Subdirectories
 
-- `adm`	- files useful for system administrators
-- `ct`	- testing tool; vendored from https://github.com/kr/ct
-- `doc`	- documentation
-- `pkg`	- scripts to make releases
-
+- `adm` - files useful for system administrators
+- `ct` - testing tool; vendored from https://github.com/kr/ct
+- `doc` - documentation
+- `pkg` - scripts to make releases
 
 ## Tests
 
 Unit tests are in test*.c. See https://github.com/kr/ct for
 information on how to write them.
-

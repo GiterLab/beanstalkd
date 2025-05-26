@@ -1,12 +1,15 @@
 # Changelog
+
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [2.0] - 2025-05-26
+
+- add support authentication via the `AUTH` command
 
 ## [1.13] - 2023-03-12
 
 - maintenace fixes
-- set up CI using GH actions 
+- set up CI using GH actions
 - quote string values in yaml dictionaries
 - use read_u32 to safely read reserve-with-timeout argument (#607)
 - fix pause-tube parameter (#604)
@@ -41,10 +44,3 @@ All notable changes to this project will be documented in this file.
 - document touch command’s TTR reset (#188)
 - add some basic benchmark tests
 - add DESTDIR support to Makefile
-
-
-[unreleased]: https://github.com/beanstalkd/beanstalkd/compare/v1.12...HEAD
-[1.13]:		  https://github.com/beanstalkd/beanstalkd/compare/v1.12...v1.13
-[1.12]:       https://github.com/beanstalkd/beanstalkd/compare/v1.11...v1.12
-[1.11]:       https://github.com/beanstalkd/beanstalkd/compare/v1.10...v1.11
-[1.10]:       https://github.com/beanstalkd/beanstalkd/compare/v1.9...v1.10

@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 typedef unsigned char uchar;
 typedef uchar         byte;
@@ -43,6 +44,9 @@ typedef int(FAlloc)(int, int);
 
 // The name of a tube cannot be longer than MAX_TUBE_NAME_LEN-1
 #define MAX_TUBE_NAME_LEN 201
+
+// The maximum length of a password is MAX_PASSWORD_LEN-1
+#define MAX_PASSWORD_LEN 65
 
 // A command can be at most LINE_BUF_SIZE chars, including "\r\n". This value
 // MUST be enough to hold the longest possible command ("pause-tube a{200} 4294967295\r\n")
@@ -406,6 +410,8 @@ struct Conn {
 
     Ms  watch;                  // the set of watched tubes by the connection
     Job reserved_jobs;          // linked list header
+
+    bool auth;                  // is the connection authenticated?
 };
 int  conn_less(void *ca, void *cb);
 void conn_setpos(void *c, size_t i);
@@ -418,9 +424,6 @@ int  conndeadlinesoon(Conn *c);
 int conn_ready(Conn *c);
 void conn_reserve_job(Conn *c, Job *j);
 #define conn_waiting(c) ((c)->type & CONN_TYPE_WAITING)
-
-
-
 
 enum
 {
@@ -452,7 +455,6 @@ int  walresvput(Wal*, Job*);
 int  walresvupdate(Wal*);
 void walgc(Wal*);
 
-
 struct File {
     File *next;
     uint refs;
@@ -478,13 +480,13 @@ void filewclose(File*);
 int  filewrjobshort(File*, Job*);
 int  filewrjobfull(File*, Job*);
 
-
 #define Portdef "11300"
 
 struct Server {
     char *port;
     char *addr;
     char *user;
+    char *password;
 
     Wal    wal;
     Socket sock;

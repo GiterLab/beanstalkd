@@ -5,6 +5,7 @@
 
 struct Server srv = {
     .port = Portdef,
+    .password = NULL,
     .wal = {
         .filesize = Filesizedef,
         .wantsync = 1,
@@ -56,7 +57,6 @@ srvserve(Server *s)
         exit(2);
     }
 
-
     for (;;) {
         int64 period = prottick(s);
 
@@ -71,7 +71,6 @@ srvserve(Server *s)
         }
     }
 }
-
 
 void
 srvaccept(Server *s, int ev)

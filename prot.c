@@ -25,6 +25,11 @@ size_t job_data_size_limit = JOB_DATA_SIZE_LIMIT_DEFAULT;
     "abcdefghijklmnopqrstuvwxyz" \
     "0123456789-+/;.$_()"
 
+#define PASSWORD_CHARS \
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ" \
+    "abcdefghijklmnopqrstuvwxyz" \
+    "0123456789-+/;.$_()!@#%^&*()[]{}|\\:<>?,~`"
+
 #define CMD_PUT "put "
 #define CMD_PEEKJOB "peek "
 #define CMD_PEEK_READY "peek-ready"
@@ -50,6 +55,7 @@ size_t job_data_size_limit = JOB_DATA_SIZE_LIMIT_DEFAULT;
 #define CMD_STATS_TUBE "stats-tube "
 #define CMD_QUIT "quit"
 #define CMD_PAUSE_TUBE "pause-tube"
+#define CMD_AUTH "auth "
 
 #define CONSTSTRLEN(m) (sizeof(m) - 1)
 
@@ -76,6 +82,7 @@ size_t job_data_size_limit = JOB_DATA_SIZE_LIMIT_DEFAULT;
 #define CMD_LIST_TUBES_WATCHED_LEN CONSTSTRLEN(CMD_LIST_TUBES_WATCHED)
 #define CMD_STATS_TUBE_LEN CONSTSTRLEN(CMD_STATS_TUBE)
 #define CMD_PAUSE_TUBE_LEN CONSTSTRLEN(CMD_PAUSE_TUBE)
+#define CMD_AUTH_LEN CONSTSTRLEN(CMD_AUTH)
 
 #define MSG_FOUND "FOUND"
 #define MSG_NOTFOUND "NOT_FOUND\r\n"
@@ -98,6 +105,9 @@ size_t job_data_size_limit = JOB_DATA_SIZE_LIMIT_DEFAULT;
 #define MSG_UNKNOWN_COMMAND "UNKNOWN_COMMAND\r\n"
 #define MSG_EXPECTED_CRLF "EXPECTED_CRLF\r\n"
 #define MSG_JOB_TOO_BIG "JOB_TOO_BIG\r\n"
+
+#define MSG_AUTHORIZED "AUTHORIZED\r\n"
+#define MSG_UNAUTHORIZED "NOT_AUTHORIZED\r\n"
 
 // Connection can be in one of these states:
 #define STATE_WANT_COMMAND  0  // conn expects a command from the client
@@ -135,7 +145,8 @@ size_t job_data_size_limit = JOB_DATA_SIZE_LIMIT_DEFAULT;
 #define OP_PAUSE_TUBE 23
 #define OP_KICKJOB 24
 #define OP_RESERVE_JOB 25
-#define TOTAL_OPS 26
+#define OP_AUTH 26
+#define TOTAL_OPS 27
 
 #define STATS_FMT "---\n" \
     "current-jobs-urgent: %" PRIu64 "\n" \
@@ -804,6 +815,7 @@ which_cmd(Conn *c)
     TEST_CMD(c->cmd, CMD_LIST_TUBES, OP_LIST_TUBES);
     TEST_CMD(c->cmd, CMD_QUIT, OP_QUIT);
     TEST_CMD(c->cmd, CMD_PAUSE_TUBE, OP_PAUSE_TUBE);
+    TEST_CMD(c->cmd, CMD_AUTH, OP_AUTH);
     return OP_UNKNOWN;
 }
 
@@ -1283,6 +1295,14 @@ is_valid_tube(const char *name, size_t max)
         name[0] != '-';
 }
 
+static bool
+is_vaild_password(const char *pass, size_t max)
+{
+    size_t len = strlen(pass);
+    return 0 < len && len <= max &&
+           strspn(pass, PASSWORD_CHARS) == len;
+}
+
 static void
 dispatch_cmd(Conn *c)
 {
@@ -1291,7 +1311,7 @@ dispatch_cmd(Conn *c)
     uint count;
     Job *j = 0;
     byte type;
-    char *size_buf, *delay_buf, *ttr_buf, *pri_buf, *end_buf, *name;
+    char *size_buf, *delay_buf, *ttr_buf, *pri_buf, *end_buf, *name, *password;
     uint32 pri;
     uint32 body_size;
     int64 delay, ttr;
@@ -1314,6 +1334,10 @@ dispatch_cmd(Conn *c)
 
     switch (type) {
     case OP_PUT:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
         if (read_u32(&pri, c->cmd + 4, &delay_buf) ||
             read_duration(&delay, delay_buf, &ttr_buf) ||
             read_duration(&ttr, ttr_buf, &size_buf) ||
@@ -1358,6 +1382,10 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_PEEK_READY:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
         /* don't allow trailing garbage */
         if (c->cmd_len != CMD_PEEK_READY_LEN + 2) {
             reply_msg(c, MSG_BAD_FORMAT);
@@ -1377,6 +1405,11 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_PEEK_DELAYED:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
+
         /* don't allow trailing garbage */
         if (c->cmd_len != CMD_PEEK_DELAYED_LEN + 2) {
             reply_msg(c, MSG_BAD_FORMAT);
@@ -1396,6 +1429,10 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_PEEK_BURIED:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
         /* don't allow trailing garbage */
         if (c->cmd_len != CMD_PEEK_BURIED_LEN + 2) {
             reply_msg(c, MSG_BAD_FORMAT);
@@ -1416,6 +1453,10 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_PEEKJOB:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
         if (read_u64(&id, c->cmd + CMD_PEEKJOB_LEN, NULL)) {
             reply_msg(c, MSG_BAD_FORMAT);
             return;
@@ -1435,6 +1476,11 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_RESERVE_TIMEOUT:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
+
         errno = 0;
         uint32 utimeout = 0;
         if (read_u32(&utimeout, c->cmd + CMD_RESERVE_TIMEOUT_LEN, &end_buf) != 0 || utimeout > INT_MAX) {
@@ -1445,6 +1491,11 @@ dispatch_cmd(Conn *c)
         /* Falls through */
 
     case OP_RESERVE:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
+
         /* don't allow trailing garbage */
         if (type == OP_RESERVE && c->cmd_len != CMD_RESERVE_LEN + 2) {
             reply_msg(c, MSG_BAD_FORMAT);
@@ -1464,6 +1515,11 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_RESERVE_JOB:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
+
         if (read_u64(&id, c->cmd + CMD_RESERVE_JOB_LEN, NULL)) {
             reply_msg(c, MSG_BAD_FORMAT);
             return;
@@ -1506,6 +1562,11 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_DELETE:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
+
         if (read_u64(&id, c->cmd + CMD_DELETE_LEN, NULL)) {
             reply_msg(c, MSG_BAD_FORMAT);
             return;
@@ -1543,6 +1604,11 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_RELEASE:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
+
         if (read_u64(&id, c->cmd + CMD_RELEASE_LEN, &pri_buf) ||
             read_u32(&pri, pri_buf, &delay_buf) ||
             read_duration(&delay, delay_buf, NULL)) {
@@ -1589,6 +1655,11 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_BURY:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
+
         if (read_u64(&id, c->cmd + CMD_BURY_LEN, &pri_buf) ||
             read_u32(&pri, pri_buf, NULL)) {
             reply_msg(c, MSG_BAD_FORMAT);
@@ -1614,6 +1685,11 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_KICK:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
+
         errno = 0;
         count = strtoul(c->cmd + CMD_KICK_LEN, &end_buf, 10);
         if (end_buf == c->cmd + CMD_KICK_LEN || errno) {
@@ -1628,6 +1704,11 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_KICKJOB:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
+
         if (read_u64(&id, c->cmd + CMD_KICKJOB_LEN, NULL)) {
             reply_msg(c, MSG_BAD_FORMAT);
             return;
@@ -1650,6 +1731,11 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_TOUCH:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
+
         if (read_u64(&id, c->cmd + CMD_TOUCH_LEN, NULL)) {
             reply_msg(c, MSG_BAD_FORMAT);
             return;
@@ -1664,6 +1750,11 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_STATS:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
+
         /* don't allow trailing garbage */
         if (c->cmd_len != CMD_STATS_LEN + 2) {
             reply_msg(c, MSG_BAD_FORMAT);
@@ -1675,6 +1766,11 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_STATSJOB:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
+
         if (read_u64(&id, c->cmd + CMD_STATSJOB_LEN, NULL)) {
             reply_msg(c, MSG_BAD_FORMAT);
             return;
@@ -1695,6 +1791,11 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_STATS_TUBE:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
+
         name = c->cmd + CMD_STATS_TUBE_LEN;
         if (!is_valid_tube(name, MAX_TUBE_NAME_LEN - 1)) {
             reply_msg(c, MSG_BAD_FORMAT);
@@ -1712,6 +1813,11 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_LIST_TUBES:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
+
         /* don't allow trailing garbage */
         if (c->cmd_len != CMD_LIST_TUBES_LEN + 2) {
             reply_msg(c, MSG_BAD_FORMAT);
@@ -1722,6 +1828,11 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_LIST_TUBE_USED:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
+
         /* don't allow trailing garbage */
         if (c->cmd_len != CMD_LIST_TUBE_USED_LEN + 2) {
             reply_msg(c, MSG_BAD_FORMAT);
@@ -1732,6 +1843,11 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_LIST_TUBES_WATCHED:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
+
         /* don't allow trailing garbage */
         if (c->cmd_len != CMD_LIST_TUBES_WATCHED_LEN + 2) {
             reply_msg(c, MSG_BAD_FORMAT);
@@ -1742,6 +1858,11 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_USE:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
+
         name = c->cmd + CMD_USE_LEN;
         if (!is_valid_tube(name, MAX_TUBE_NAME_LEN - 1)) {
             reply_msg(c, MSG_BAD_FORMAT);
@@ -1764,6 +1885,11 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_WATCH:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
+
         name = c->cmd + CMD_WATCH_LEN;
         if (!is_valid_tube(name, MAX_TUBE_NAME_LEN - 1)) {
             reply_msg(c, MSG_BAD_FORMAT);
@@ -1789,6 +1915,11 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_IGNORE:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
+
         name = c->cmd + CMD_IGNORE_LEN;
         if (!is_valid_tube(name, MAX_TUBE_NAME_LEN - 1)) {
             reply_msg(c, MSG_BAD_FORMAT);
@@ -1809,10 +1940,20 @@ dispatch_cmd(Conn *c)
         return;
 
     case OP_QUIT:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
+
         c->state = STATE_CLOSE;
         return;
 
     case OP_PAUSE_TUBE:
+        if (!c->auth) {
+            c->state = STATE_CLOSE;
+            return;
+        }
+
         if (read_tube_name(&name, c->cmd + CMD_PAUSE_TUBE_LEN, &delay_buf) ||
             read_duration(&delay, delay_buf, NULL)) {
             reply_msg(c, MSG_BAD_FORMAT);
@@ -1842,6 +1983,29 @@ dispatch_cmd(Conn *c)
         t->stat.pause_ct++;
 
         reply_line(c, STATE_SEND_WORD, "PAUSED\r\n");
+        return;
+
+    case OP_AUTH:
+        if (c->auth) {
+            reply_msg(c, MSG_AUTHORIZED);
+            return;
+        }
+        password = c->cmd + CMD_AUTH_LEN;
+        if (!is_vaild_password(password, MAX_PASSWORD_LEN - 1)) {
+            reply_msg(c, MSG_BAD_FORMAT);
+            return;
+        }
+        op_ct[type]++;
+
+        if (verbose >= 5) {
+            printf("<%d AUTH %s\n", c->sock.fd, password);
+        }
+        if (strncmp(password, c->srv->password, MAX_PASSWORD_LEN-1) == 0) {
+            c->auth = true;
+            reply_msg(c, MSG_AUTHORIZED);
+        } else {
+            reply_msg(c, MSG_UNAUTHORIZED);
+        }
         return;
 
     default:
@@ -2250,6 +2414,12 @@ h_accept(const int fd, const short which, Server *s)
     c->sock.x = c;
     c->sock.f = (Handle)prothandle;
     c->sock.fd = cfd;
+    // if password is not empty, then the connection needs to be authenticated
+    if (s->password == NULL || s->password[0] == '\0') {
+        c->auth = true;
+    } else {
+        c->auth = false;
+    }
 
     r = sockwant(&c->sock, 'r');
     if (r == -1) {

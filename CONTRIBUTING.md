@@ -34,7 +34,6 @@ has already been fixed.
 Please see how to write good commit messages in the Go contributing guide
 [here](https://golang.org/doc/contribute.html#commit_messages).
 
-
 ## Pull Requests
 
 When opening a pull request, try to keep the changes focused on

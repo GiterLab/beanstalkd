@@ -3,6 +3,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -81,9 +82,49 @@ set_sig_handlers()
     }
 }
 
+static const char *
+get_port_from_env()
+{
+    const char *port = getenv("BEANSTALKD_PORT");
+    if (!port) {
+        port = "11300"; // default port
+    } else if (strlen(port) > 5) {
+        twarnx("BEANSTALKD_PORT is too long, maximum length is %d", 5);
+        exit(4);
+    }
+    return port;
+}
+
+static const char *
+get_password_from_env()
+{
+    const char *password = getenv("BEANSTALKD_PASSWORD");
+    if (password && strlen(password) > MAX_PASSWORD_LEN - 1) {
+        twarnx("BEANSTALKD_PASSWORD is too long, maximum length is %d", MAX_PASSWORD_LEN - 1);
+        exit(5);
+    }
+    return password;
+}
+
 int
 main(int argc, char **argv)
 {
+    // load the server configuration
+    srv.port = (char *)get_port_from_env();
+    srv.password = (char *)get_password_from_env();
+
+    printf("version: %s\n", version);
+    if (srv.port) {
+        printf("port: %s\n", srv.port);
+    } else {
+        printf("no port set, using default %s\n", srv.port);
+    }
+    if (srv.password != NULL && srv.password[0] != '\0') {
+        printf("using password\n");
+    } else {
+        printf("password is empty\n");
+    }
+
     UNUSED_PARAMETER(argc);
 
     progname = argv[0];

@@ -115,6 +115,7 @@ usage(int code)
             "          max allowed is %d bytes\n"
             " -s BYTES set the size of each write-ahead log file (default is %d);\n"
             "          will be rounded up to a multiple of 4096 bytes\n"
+            " -P PWD   set password for the beanstalkd server\n"
             " -v       show version information\n"
             " -V       increase verbosity\n"
             " -h       show this help\n",
@@ -126,7 +127,6 @@ usage(int code)
     exit(code);
 }
 
-
 static char *flagusage(char *flag) __attribute__ ((noreturn));
 static char *
 flagusage(char *flag)
@@ -134,7 +134,6 @@ flagusage(char *flag)
     warnx("flag requires an argument: %s", flag);
     usage(5);
 }
-
 
 static size_t
 parse_size_t(char *str)
@@ -200,6 +199,20 @@ optparse(Server *s, char **argv)
                 case 'b':
                     s->wal.dir = EARGF(flagusage("-b"));
                     s->wal.use = 1;
+                    break;
+                case 'P':
+                    if (s->password) {
+                        warnx("password already set, ignoring -P option");
+                    } else {
+                        s->password = EARGF(flagusage("-P"));
+                        if (strlen(s->password) > MAX_PASSWORD_LEN - 1) {
+                            warnx("password is too long, maximum length is %d", MAX_PASSWORD_LEN-1);
+                            usage(5);
+                        }
+                        if (verbose >= 5) {
+                            printf("setting password to '%s'\n", s->password);
+                        }
+                    }
                     break;
                 case 'h':
                     usage(0);
