@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [2.0] - 2025-05-26
 
-- add support authentication via the `AUTH` command
+- add support authentication via the `auth <password>` command
 
 ## [1.13] - 2023-03-12
 
@@ -44,3 +44,8 @@ All notable changes to this project will be documented in this file.
 - document touch command’s TTR reset (#188)
 - add some basic benchmark tests
 - add DESTDIR support to Makefile
+
+[1.13]: https://github.com/GiterLab/beanstalkd/compare/v1.12...v1.13
+[1.12]: https://github.com/GiterLab/beanstalkd/compare/v1.11...v1.12
+[1.11]: https://github.com/GiterLab/beanstalkd/compare/v1.10...v1.11
+[1.10]: https://github.com/GiterLab/beanstalkd/compare/v1.9...v1.10
