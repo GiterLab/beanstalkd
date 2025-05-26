@@ -1,18 +1,16 @@
-#include <stdint.h>
+#include "dat.h"
+#include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
+#include <port.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <errno.h>
-#include <poll.h>
-#include <port.h>
-#include "dat.h"
 
 static int portfd;
 
-int
-sockinit(void)
-{
+int sockinit(void) {
     portfd = port_create();
     if (portfd == -1) {
         twarn("port_create");
@@ -21,10 +19,7 @@ sockinit(void)
     return 0;
 }
 
-
-int
-sockwant(Socket *s, int rw)
-{
+int sockwant(Socket *s, int rw) {
     int events = 0;
 
     if (rw) {
@@ -53,10 +48,7 @@ sockwant(Socket *s, int rw)
     }
 }
 
-
-int
-socknext(Socket **s, int64 timeout)
-{
+int socknext(Socket **s, int64 timeout) {
     int r;
     uint_t n = 1;
     struct port_event pe;

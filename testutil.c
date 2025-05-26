@@ -1,15 +1,13 @@
 #include "ct/ct.h"
 #include "dat.h"
 #include <stdint.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
 #include <unistd.h>
 
-void
-cttest_allocf()
-{
+void cttest_allocf() {
     char *got;
 
     got = fmtalloc("hello, %s %d", "world", 5);
@@ -17,9 +15,7 @@ cttest_allocf()
     free(got);
 }
 
-void
-cttest_opt_none()
-{
+void cttest_opt_none() {
     char *args[] = {
         NULL,
     };
@@ -30,22 +26,18 @@ cttest_opt_none()
     assert(job_data_size_limit == JOB_DATA_SIZE_LIMIT_DEFAULT);
     assert(srv.wal.filesize == Filesizedef);
     assert(srv.wal.wantsync == 1);
-    assert(srv.wal.syncrate == DEFAULT_FSYNC_MS*1000000);
+    assert(srv.wal.syncrate == DEFAULT_FSYNC_MS * 1000000);
     assert(srv.user == NULL);
     assert(srv.wal.dir == NULL);
     assert(srv.wal.use == 0);
     assert(verbose == 0);
 }
 
-static void
-success(void)
-{
+static void success(void) {
     _exit(0);
 }
 
-void
-cttest_optminus()
-{
+void cttest_optminus() {
     char *args[] = {
         "-",
         NULL,
@@ -56,9 +48,7 @@ cttest_optminus()
     assertf(0, "optparse failed to call exit");
 }
 
-void
-cttest_optp()
-{
+void cttest_optp() {
     char *args[] = {
         "-p1234",
         NULL,
@@ -68,9 +58,7 @@ cttest_optp()
     assert(strcmp(srv.port, "1234") == 0);
 }
 
-void
-cttest_optl()
-{
+void cttest_optl() {
     char *args[] = {
         "-llocalhost",
         NULL,
@@ -80,9 +68,7 @@ cttest_optl()
     assert(strcmp(srv.addr, "localhost") == 0);
 }
 
-void
-cttest_optlseparate()
-{
+void cttest_optlseparate() {
     char *args[] = {
         "-l",
         "localhost",
@@ -93,9 +79,7 @@ cttest_optlseparate()
     assert(strcmp(srv.addr, "localhost") == 0);
 }
 
-void
-cttest_optz()
-{
+void cttest_optz() {
     char *args[] = {
         "-z1234",
         NULL,
@@ -105,9 +89,7 @@ cttest_optz()
     assert(job_data_size_limit == 1234);
 }
 
-void
-cttest_optz_more_than_max()
-{
+void cttest_optz_more_than_max() {
     char *args[] = {
         "-z1073741825",
         NULL,
@@ -117,9 +99,7 @@ cttest_optz_more_than_max()
     assert(job_data_size_limit == 1073741824);
 }
 
-void
-cttest_opts()
-{
+void cttest_opts() {
     char *args[] = {
         "-s1234",
         NULL,
@@ -129,9 +109,7 @@ cttest_opts()
     assert(srv.wal.filesize == 1234);
 }
 
-void
-cttest_optf()
-{
+void cttest_optf() {
     char *args[] = {
         "-f1234",
         NULL,
@@ -142,9 +120,7 @@ cttest_optf()
     assert(srv.wal.wantsync == 1);
 }
 
-void
-cttest_optF()
-{
+void cttest_optF() {
     char *args[] = {
         "-f1234",
         "-F",
@@ -155,9 +131,7 @@ cttest_optF()
     assert(srv.wal.wantsync == 0);
 }
 
-void
-cttest_optu()
-{
+void cttest_optu() {
     char *args[] = {
         "-ukr",
         NULL,
@@ -167,9 +141,7 @@ cttest_optu()
     assert(strcmp(srv.user, "kr") == 0);
 }
 
-void
-cttest_optb()
-{
+void cttest_optb() {
     char *args[] = {
         "-bfoo",
         NULL,
@@ -180,9 +152,7 @@ cttest_optb()
     assert(srv.wal.use == 1);
 }
 
-void
-cttest_optV()
-{
+void cttest_optV() {
     char *args[] = {
         "-V",
         NULL,
@@ -192,9 +162,7 @@ cttest_optV()
     assert(verbose == 1);
 }
 
-void
-cttest_optV_V()
-{
+void cttest_optV_V() {
     char *args[] = {
         "-V",
         "-V",
@@ -205,9 +173,7 @@ cttest_optV_V()
     assert(verbose == 2);
 }
 
-void
-cttest_optVVV()
-{
+void cttest_optVVV() {
     char *args[] = {
         "-VVV",
         NULL,
@@ -217,9 +183,7 @@ cttest_optVVV()
     assert(verbose == 3);
 }
 
-void
-cttest_optVFVu()
-{
+void cttest_optVFVu() {
     char *args[] = {
         "-VFVukr",
         NULL,

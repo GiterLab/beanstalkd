@@ -1,45 +1,45 @@
 #include "dat.h"
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <string.h>
-#include <errno.h>
 #include <dirent.h>
-#include <sys/uio.h>
-#include <sys/stat.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/uio.h>
+#include <unistd.h>
 
 static int reserve(Wal *w, int n);
-
 
 // Reads w->dir for files matching binlog.NNN,
 // sets w->next to the next unused number, and
 // returns the minimum number.
 // If no files are found, sets w->next to 1 and
 // returns a large number.
-static int
-walscandir(Wal *w)
-{
+static int walscandir(Wal *w) {
     static char base[] = "binlog.";
     static const int len = sizeof(base) - 1;
     DIR *d;
     struct dirent *e;
-    int min = 1<<30;
+    int min = 1 << 30;
     int max = 0;
     int n;
     char *p;
 
     d = opendir(w->dir);
-    if (!d) return min;
+    if (!d)
+        return min;
 
     while ((e = readdir(d))) {
         if (strncmp(e->d_name, base, len) == 0) {
-            n = strtol(e->d_name+len, &p, 10);
+            n = strtol(e->d_name + len, &p, 10);
             if (p && *p == '\0') {
-                if (n > max) max = n;
-                if (n < min) min = n;
+                if (n > max)
+                    max = n;
+                if (n < min)
+                    min = n;
             }
         }
     }
@@ -49,10 +49,7 @@ walscandir(Wal *w)
     return min;
 }
 
-
-void
-walgc(Wal *w)
-{
+void walgc(Wal *w) {
     File *f;
 
     while (w->head && !w->head->refs) {
@@ -69,11 +66,8 @@ walgc(Wal *w)
     }
 }
 
-
 // returns 1 on success, 0 on error.
-static int
-usenext(Wal *w)
-{
+static int usenext(Wal *w) {
     File *f;
 
     f = w->cur;
@@ -87,23 +81,18 @@ usenext(Wal *w)
     return 1;
 }
 
-
-static int
-ratio(Wal *w)
-{
+static int ratio(Wal *w) {
     int64 n, d;
 
     d = w->alive + w->resv;
     n = (int64)w->nfile * (int64)w->filesize - d;
-    if (!d) return 0;
+    if (!d)
+        return 0;
     return n / d;
 }
 
-
 // Returns the number of bytes reserved or 0 on error.
-static int
-walresvmigrate(Wal *w, Job *j)
-{
+static int walresvmigrate(Wal *w, Job *j) {
     int z = 0;
 
     // reserve only space for the migrated full job record
@@ -116,10 +105,7 @@ walresvmigrate(Wal *w, Job *j)
     return reserve(w, z);
 }
 
-
-static void
-moveone(Wal *w)
-{
+static void moveone(Wal *w) {
     Job *j;
 
     if (w->head == w->cur || w->head->next == w->cur) {
@@ -144,25 +130,19 @@ moveone(Wal *w)
     walwrite(w, j);
 }
 
-
-static void
-walcompact(Wal *w)
-{
+static void walcompact(Wal *w) {
     int r;
 
-    for (r=ratio(w); r>=2; r--) {
+    for (r = ratio(w); r >= 2; r--) {
         moveone(w);
     }
 }
 
-
-static void
-walsync(Wal *w)
-{
+static void walsync(Wal *w) {
     int64 now;
 
     now = nanoseconds();
-    if (w->wantsync && now >= w->lastsync+w->syncrate) {
+    if (w->wantsync && now >= w->lastsync + w->syncrate) {
         w->lastsync = now;
         if (fsync(w->cur->fd) == -1) {
             twarn("fsync");
@@ -170,17 +150,15 @@ walsync(Wal *w)
     }
 }
 
-
 // Walwrite writes j to the log w (if w is enabled).
 // On failure, walwrite disables w and returns 0; on success, it returns 1.
 // Unlke walresv*, walwrite should never fail because of a full disk.
 // If w is disabled, then walwrite takes no action and returns 1.
-int
-walwrite(Wal *w, Job *j)
-{
+int walwrite(Wal *w, Job *j) {
     int r = 0;
 
-    if (!w->use) return 1;
+    if (!w->use)
+        return 1;
     if (w->cur->resv > 0 || usenext(w)) {
         if (j->file) {
             r = filewrjobshort(w->cur, j);
@@ -196,20 +174,14 @@ walwrite(Wal *w, Job *j)
     return r;
 }
 
-
-void
-walmaint(Wal *w)
-{
+void walmaint(Wal *w) {
     if (w->use) {
         walcompact(w);
         walsync(w);
     }
 }
 
-
-static int
-makenextfile(Wal *w)
-{
+static int makenextfile(Wal *w) {
     File *f;
 
     f = new(File);
@@ -236,25 +208,20 @@ makenextfile(Wal *w)
     return 1;
 }
 
-
-static void
-moveresv(File *to, File *from, int n)
-{
+static void moveresv(File *to, File *from, int n) {
     from->resv -= n;
     from->free += n;
     to->resv += n;
     to->free -= n;
 }
 
-
-static int
-needfree(Wal *w, int n)
-{
-    if (w->tail->free >= n) return n;
-    if (makenextfile(w)) return n;
+static int needfree(Wal *w, int n) {
+    if (w->tail->free >= n)
+        return n;
+    if (makenextfile(w))
+        return n;
     return 0;
 }
-
 
 // Ensures:
 //  1. b->resv is congruent to n (mod z).
@@ -265,17 +232,17 @@ needfree(Wal *w, int n)
 // We might have to allocate a new file.
 // Returns 1 on success, otherwise 0. If there was a failure,
 // w->tail is not updated.
-static int
-balancerest(Wal *w, File *b, int n)
-{
+static int balancerest(Wal *w, File *b, int n) {
     int rest, c, r;
     static const int z = sizeof(int) + sizeof(Jobrec);
 
-    if (!b) return 1;
+    if (!b)
+        return 1;
 
     rest = b->resv - n;
     r = rest % z;
-    if (r == 0) return balancerest(w, b->next, 0);
+    if (r == 0)
+        return balancerest(w, b->next, 0);
 
     c = z - r;
     if (w->tail->resv >= c && b->free >= c) {
@@ -291,7 +258,6 @@ balancerest(Wal *w, File *b, int n)
     return balancerest(w, b->next, 0);
 }
 
-
 // Ensures:
 //  1. w->cur->resv >= n.
 //  2. w->cur->resv is congruent to n (mod z).
@@ -302,9 +268,7 @@ balancerest(Wal *w, File *b, int n)
 // We might have to allocate a new file.
 // Returns 1 on success, otherwise 0. If there was a failure,
 // w->tail is not updated.
-static int
-balance(Wal *w, int n)
-{
+static int balance(Wal *w, int n) {
     // Invariant 1
     // (this loop will run at most once)
     while (w->cur->resv < n) {
@@ -324,15 +288,13 @@ balance(Wal *w, int n)
     return balancerest(w, w->cur, n);
 }
 
-
 // Returns the number of bytes successfully reserved: either 0 or n.
-static int
-reserve(Wal *w, int n)
-{
+static int reserve(Wal *w, int n) {
     int r;
 
     // return value must be nonzero but is otherwise ignored
-    if (!w->use) return 1;
+    if (!w->use)
+        return 1;
 
     if (w->cur->free >= n) {
         w->cur->free -= n;
@@ -361,11 +323,8 @@ reserve(Wal *w, int n)
     return n;
 }
 
-
 // Returns the number of bytes reserved or 0 on error.
-int
-walresvput(Wal *w, Job *j)
-{
+int walresvput(Wal *w, Job *j) {
     int z = 0;
 
     // reserve space for the initial job record
@@ -381,22 +340,16 @@ walresvput(Wal *w, Job *j)
     return reserve(w, z);
 }
 
-
 // Returns the number of bytes reserved or 0 on error.
-int
-walresvupdate(Wal *w)
-{
+int walresvupdate(Wal *w) {
     int z = 0;
-    z +=sizeof(int);
-    z +=sizeof(Jobrec);
+    z += sizeof(int);
+    z += sizeof(Jobrec);
     return reserve(w, z);
 }
 
-
 // Returns the number of locks acquired: either 0 or 1.
-int
-waldirlock(Wal *w)
-{
+int waldirlock(Wal *w) {
     int r;
     int fd;
     struct flock lk;
@@ -410,7 +363,7 @@ waldirlock(Wal *w)
     }
     snprintf(path, path_length, "%s/lock", w->dir);
 
-    fd = open(path, O_WRONLY|O_CREAT, 0600);
+    fd = open(path, O_WRONLY | O_CREAT, 0600);
     free(path);
     if (fd == -1) {
         twarn("open");
@@ -432,10 +385,7 @@ waldirlock(Wal *w)
     return 1;
 }
 
-
-void
-walread(Wal *w, Job *list, int min)
-{
+void walread(Wal *w, Job *list, int min) {
     int i;
     int err = 0;
 
@@ -473,10 +423,7 @@ walread(Wal *w, Job *list, int min)
     }
 }
 
-
-void
-walinit(Wal *w, Job *list)
-{
+void walinit(Wal *w, Job *list) {
     int min;
 
     min = walscandir(w);

@@ -1,24 +1,24 @@
 #include "ct/ct.h"
 #include "dat.h"
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <signal.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/select.h>
-#include <sys/un.h>
+#include <arpa/inet.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
-#include <arpa/inet.h>
-#include <fcntl.h>
+#include <signal.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/select.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/un.h>
 #include <sys/wait.h>
-#include <errno.h>
+#include <unistd.h>
 
 static int srvpid, size;
 
@@ -30,19 +30,14 @@ static int64 timeout = 5000000000LL;
 // should fail with ENOSPC result.
 static byte fallocpat[3];
 
-
-static int
-exist(char *path)
-{
+static int exist(char *path) {
     struct stat s;
 
     int r = stat(path, &s);
     return r != -1;
 }
 
-static int
-wrapfalloc(int fd, int size)
-{
+static int wrapfalloc(int fd, int size) {
     static size_t c = 0;
 
     printf("\nwrapfalloc: fd=%d size=%d\n", fd, size);
@@ -52,9 +47,7 @@ wrapfalloc(int fd, int size)
     return rawfalloc(fd, size);
 }
 
-static void
-muststart(char *a0, char *a1, char *a2, char *a3, char *a4)
-{
+static void muststart(char *a0, char *a1, char *a2, char *a3, char *a4) {
     srvpid = fork();
     if (srvpid < 0) {
         twarn("fork");
@@ -73,9 +66,7 @@ muststart(char *a0, char *a1, char *a2, char *a3, char *a4)
     execlp(a0, a0, a1, a2, a3, a4, NULL);
 }
 
-static int
-mustdiallocal(int port)
-{
+static int mustdiallocal(int port) {
     struct sockaddr_in addr = {
         .sin_family = AF_INET,
         .sin_port = htons(port),
@@ -110,9 +101,7 @@ mustdiallocal(int port)
     return fd;
 }
 
-static int
-mustdialunix(char *socket_file)
-{
+static int mustdialunix(char *socket_file) {
     struct sockaddr_un addr;
     const size_t maxlen = sizeof(addr.sun_path);
     addr.sun_family = AF_UNIX;
@@ -133,16 +122,12 @@ mustdialunix(char *socket_file)
     return fd;
 }
 
-static void
-exit_process(int signum)
-{
+static void exit_process(int signum) {
     UNUSED_PARAMETER(signum);
     exit(0);
 }
 
-static void
-set_sig_handler()
-{
+static void set_sig_handler() {
     struct sigaction sa;
 
     sa.sa_flags = 0;
@@ -164,9 +149,7 @@ set_sig_handler()
 // Kill the srvpid (child process) with SIGTERM to give it a chance
 // to write gcov data to the filesystem before ct kills it with SIGKILL.
 // Do nothing in case of srvpid==0; child was already killed.
-static void
-kill_srvpid(void)
-{
+static void kill_srvpid(void) {
     if (!srvpid)
         return;
     kill(srvpid, SIGTERM);
@@ -174,15 +157,13 @@ kill_srvpid(void)
     srvpid = 0;
 }
 
-#define SERVER() (progname=__func__, mustforksrv())
-#define SERVER_UNIX() (progname=__func__, mustforksrv_unix())
+#define SERVER()      (progname = __func__, mustforksrv())
+#define SERVER_UNIX() (progname = __func__, mustforksrv_unix())
 
 // Forks the server storing the pid in srvpid.
 // The parent process returns port assigned.
 // The child process serves until the SIGTERM is received by it.
-static int
-mustforksrv(void)
-{
+static int mustforksrv(void) {
     struct sockaddr_in addr;
 
     srv.sock.fd = make_server_socket("127.0.0.1", "0");
@@ -220,12 +201,10 @@ mustforksrv(void)
     srv_acquire_wal(&srv);
 
     srvserve(&srv); /* does not return */
-    exit(1); /* satisfy the compiler */
+    exit(1);        /* satisfy the compiler */
 }
 
-static char *
-mustforksrv_unix(void)
-{
+static char *mustforksrv_unix(void) {
     static char path[90];
     char name[95];
     snprintf(path, sizeof(path), "%s/socket", ctdir());
@@ -258,12 +237,10 @@ mustforksrv_unix(void)
     srv_acquire_wal(&srv);
 
     srvserve(&srv); /* does not return */
-    exit(1); /* satisfy the compiler */
+    exit(1);        /* satisfy the compiler */
 }
 
-static char *
-readline(int fd)
-{
+static char *readline(int fd) {
     char c = 0, p = 0;
     static char buf[1024];
     fd_set rfd;
@@ -277,8 +254,8 @@ readline(int fd)
         FD_ZERO(&rfd);
         FD_SET(fd, &rfd);
         tv.tv_sec = timeout / 1000000000;
-        tv.tv_usec = (timeout/1000) % 1000000;
-        int r = select(fd+1, &rfd, NULL, NULL, &tv);
+        tv.tv_usec = (timeout / 1000) % 1000000;
+        int r = select(fd + 1, &rfd, NULL, NULL, &tv);
         switch (r) {
         case 1:
             break;
@@ -300,7 +277,7 @@ readline(int fd)
             perror("write");
             exit(1);
         }
-        if (i >= sizeof(buf)-1) {
+        if (i >= sizeof(buf) - 1) {
             fputs("response too big", stderr);
             exit(4);
         }
@@ -316,23 +293,17 @@ readline(int fd)
     return buf;
 }
 
-static void
-ckresp(int fd, char *exp)
-{
+static void ckresp(int fd, char *exp) {
     char *line = readline(fd);
     assertf(strcmp(exp, line) == 0, "\"%s\" != \"%s\"", exp, line);
 }
 
-static void
-ckrespsub(int fd, char *sub)
-{
+static void ckrespsub(int fd, char *sub) {
     char *line = readline(fd);
     assertf(strstr(line, sub), "\"%s\" not in \"%s\"", sub, line);
 }
 
-static void
-writefull(int fd, char *s, int n)
-{
+static void writefull(int fd, char *s, int n) {
     int c;
     for (; n; n -= c) {
         c = write(fd, s, n);
@@ -344,17 +315,13 @@ writefull(int fd, char *s, int n)
     }
 }
 
-static void
-mustsend(int fd, char *s)
-{
+static void mustsend(int fd, char *s) {
     writefull(fd, s, strlen(s));
     printf(">%d %s", fd, s);
     fflush(stdout);
 }
 
-static int
-filesize(char *path)
-{
+static int filesize(char *path) {
     struct stat s;
 
     int r = stat(path, &s);
@@ -365,18 +332,14 @@ filesize(char *path)
     return s.st_size;
 }
 
-void
-cttest_unknown_command()
-{
+void cttest_unknown_command() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "nont10knowncommand\r\n");
     ckresp(fd, "UNKNOWN_COMMAND\r\n");
 }
 
-void
-cttest_too_long_commandline()
-{
+void cttest_too_long_commandline() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     int i;
@@ -391,9 +354,7 @@ cttest_too_long_commandline()
     ckresp(fd, "INSERTED 1\r\n");
 }
 
-void
-cttest_put_in_drain()
-{
+void cttest_put_in_drain() {
     enter_drain_mode(SIGUSR1);
     int port = SERVER();
     int fd = mustdiallocal(port);
@@ -402,9 +363,7 @@ cttest_put_in_drain()
     ckresp(fd, "DRAINING\r\n");
 }
 
-void
-cttest_peek_ok()
-{
+void cttest_peek_ok() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "put 0 0 1 1\r\n");
@@ -416,9 +375,7 @@ cttest_peek_ok()
     ckresp(fd, "a\r\n");
 }
 
-void
-cttest_peek_not_found()
-{
+void cttest_peek_not_found() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "put 0 0 1 1\r\n");
@@ -427,13 +384,11 @@ cttest_peek_not_found()
 
     mustsend(fd, "peek 2\r\n");
     ckresp(fd, "NOT_FOUND\r\n");
-    mustsend(fd, "peek 18446744073709551615\r\n");  // UINT64_MAX
+    mustsend(fd, "peek 18446744073709551615\r\n"); // UINT64_MAX
     ckresp(fd, "NOT_FOUND\r\n");
 }
 
-void
-cttest_peek_ok_unix()
-{
+void cttest_peek_ok_unix() {
     char *name = SERVER_UNIX();
     int fd = mustdialunix(name);
     mustsend(fd, "put 0 0 1 1\r\n");
@@ -447,18 +402,14 @@ cttest_peek_ok_unix()
     unlink(name);
 }
 
-void
-cttest_unix_auto_removal()
-{
+void cttest_unix_auto_removal() {
     // Twice, to trigger autoremoval
     SERVER_UNIX();
     kill_srvpid();
     SERVER_UNIX();
 }
 
-void
-cttest_peek_bad_format()
-{
+void cttest_peek_bad_format() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "peek 18446744073709551616\r\n"); // UINT64_MAX+1
@@ -471,9 +422,7 @@ cttest_peek_bad_format()
     ckresp(fd, "BAD_FORMAT\r\n");
 }
 
-void
-cttest_peek_delayed()
-{
+void cttest_peek_delayed() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "peek-delayed\r\n");
@@ -507,9 +456,7 @@ cttest_peek_delayed()
     ckresp(fd, "NOT_FOUND\r\n");
 }
 
-void
-cttest_peek_buried_kick()
-{
+void cttest_peek_buried_kick() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "put 0 0 1 1\r\n");
@@ -547,9 +494,7 @@ cttest_peek_buried_kick()
     ckresp(fd, "KICKED 0\r\n");
 }
 
-void
-cttest_touch_bad_format()
-{
+void cttest_touch_bad_format() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "touch a111\r\n");
@@ -560,9 +505,7 @@ cttest_touch_bad_format()
     ckresp(fd, "BAD_FORMAT\r\n");
 }
 
-void
-cttest_touch_not_found()
-{
+void cttest_touch_not_found() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "touch 1\r\n");
@@ -571,9 +514,7 @@ cttest_touch_not_found()
     ckresp(fd, "NOT_FOUND\r\n");
 }
 
-void
-cttest_bury_bad_format()
-{
+void cttest_bury_bad_format() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "bury 111abc 2\r\n");
@@ -584,9 +525,7 @@ cttest_bury_bad_format()
     ckresp(fd, "BAD_FORMAT\r\n");
 }
 
-void
-cttest_kickjob_bad_format()
-{
+void cttest_kickjob_bad_format() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "kick-job a111\r\n");
@@ -597,9 +536,7 @@ cttest_kickjob_bad_format()
     ckresp(fd, "BAD_FORMAT\r\n");
 }
 
-void
-cttest_kickjob_buried()
-{
+void cttest_kickjob_buried() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "put 0 0 1 1\r\n");
@@ -620,9 +557,7 @@ cttest_kickjob_buried()
     ckresp(fd, "NOT_FOUND\r\n");
 }
 
-void
-cttest_kickjob_delayed()
-{
+void cttest_kickjob_delayed() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     // jid=1 - no delay, jid=2 - delay
@@ -641,9 +576,7 @@ cttest_kickjob_delayed()
     ckresp(fd, "NOT_FOUND\r\n");
 }
 
-void
-cttest_pause()
-{
+void cttest_pause() {
     int64 s;
 
     int port = SERVER();
@@ -660,18 +593,14 @@ cttest_pause()
     assert(nanoseconds() - s >= 1000000000); // 1s
 }
 
-void
-cttest_underscore()
-{
+void cttest_underscore() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "use x_y\r\n");
     ckresp(fd, "USING x_y\r\n");
 }
 
-void
-cttest_2cmdpacket()
-{
+void cttest_2cmdpacket() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "use a\r\nuse b\r\n");
@@ -679,9 +608,7 @@ cttest_2cmdpacket()
     ckresp(fd, "USING b\r\n");
 }
 
-void
-cttest_too_big()
-{
+void cttest_too_big() {
     job_data_size_limit = 10;
     int port = SERVER();
     int fd = mustdiallocal(port);
@@ -693,9 +620,7 @@ cttest_too_big()
     ckresp(fd, "INSERTED 1\r\n");
 }
 
-void
-cttest_job_size_invalid()
-{
+void cttest_job_size_invalid() {
     job_data_size_limit = JOB_DATA_SIZE_LIMIT_MAX;
     int port = SERVER();
     int fd = mustdiallocal(port);
@@ -710,22 +635,20 @@ cttest_job_size_invalid()
     ckresp(fd, "INSERTED 1\r\n");
 }
 
-void
-cttest_job_size_max_plus_1()
-{
+void cttest_job_size_max_plus_1() {
     /* verify that server reject the job larger than maximum allowed. */
     job_data_size_limit = JOB_DATA_SIZE_LIMIT_MAX;
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "put 0 0 0 1073741825\r\n");
 
-    const int len = 1024*1024;
-    char body[len+1];
+    const int len = 1024 * 1024;
+    char body[len + 1];
     memset(body, 'a', len);
     body[len] = 0;
 
     int i;
-    for (i=0; i<JOB_DATA_SIZE_LIMIT_MAX; i+=len) {
+    for (i = 0; i < JOB_DATA_SIZE_LIMIT_MAX; i += len) {
         mustsend(fd, body);
     }
     mustsend(fd, "x");
@@ -733,9 +656,7 @@ cttest_job_size_max_plus_1()
     ckresp(fd, "JOB_TOO_BIG\r\n");
 }
 
-void
-cttest_delete_ready()
-{
+void cttest_delete_ready() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "put 0 0 0 0\r\n");
@@ -745,9 +666,7 @@ cttest_delete_ready()
     ckresp(fd, "DELETED\r\n");
 }
 
-void
-cttest_delete_reserved_by_other()
-{
+void cttest_delete_reserved_by_other() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "put 0 0 1 1\r\n");
@@ -763,9 +682,7 @@ cttest_delete_reserved_by_other()
     ckresp(fd, "NOT_FOUND\r\n");
 }
 
-void
-cttest_delete_bad_format()
-{
+void cttest_delete_bad_format() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "delete 18446744073709551616\r\n"); // UINT64_MAX+1
@@ -778,9 +695,7 @@ cttest_delete_bad_format()
     ckresp(fd, "BAD_FORMAT\r\n");
 }
 
-void
-cttest_multi_tube()
-{
+void cttest_multi_tube() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "use abc\r\n");
@@ -801,9 +716,7 @@ cttest_multi_tube()
     ckresp(fd, "RESERVED 2 0\r\n");
 }
 
-void
-cttest_negative_delay()
-{
+void cttest_negative_delay() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "put 512 -1 100 0\r\n");
@@ -812,9 +725,7 @@ cttest_negative_delay()
 
 /* TODO: add more edge cases tests for delay and ttr */
 
-void
-cttest_garbage_priority()
-{
+void cttest_garbage_priority() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "put -1kkdj9djjkd9 0 100 1\r\n");
@@ -822,9 +733,7 @@ cttest_garbage_priority()
     ckresp(fd, "BAD_FORMAT\r\n");
 }
 
-void
-cttest_negative_priority()
-{
+void cttest_negative_priority() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "put -1 0 100 1\r\n");
@@ -832,9 +741,7 @@ cttest_negative_priority()
     ckresp(fd, "BAD_FORMAT\r\n");
 }
 
-void
-cttest_max_priority()
-{
+void cttest_max_priority() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "put 4294967295 0 100 1\r\n");
@@ -842,9 +749,7 @@ cttest_max_priority()
     ckresp(fd, "INSERTED 1\r\n");
 }
 
-void
-cttest_too_big_priority()
-{
+void cttest_too_big_priority() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "put 4294967296 0 100 1\r\n");
@@ -852,9 +757,7 @@ cttest_too_big_priority()
     ckresp(fd, "BAD_FORMAT\r\n");
 }
 
-void
-cttest_omit_time_left()
-{
+void cttest_omit_time_left() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "put 0 0 5 1\r\n");
@@ -865,9 +768,7 @@ cttest_omit_time_left()
     ckrespsub(fd, "\ntime-left: 0\n");
 }
 
-void
-cttest_small_delay()
-{
+void cttest_small_delay() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "put 0 1 1 0\r\n");
@@ -875,9 +776,7 @@ cttest_small_delay()
     ckresp(fd, "INSERTED 1\r\n");
 }
 
-void
-cttest_delayed_to_ready()
-{
+void cttest_delayed_to_ready() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "put 0 1 1 0\r\n");
@@ -913,9 +812,7 @@ cttest_delayed_to_ready()
     ckrespsub(fd, "\ntotal-jobs: 1\n");
 }
 
-void
-cttest_statsjob_ck_format()
-{
+void cttest_statsjob_ck_format() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "stats-job 111ABC\r\n");
@@ -926,9 +823,7 @@ cttest_statsjob_ck_format()
     ckresp(fd, "NOT_FOUND\r\n");
 }
 
-void
-cttest_stats_tube()
-{
+void cttest_stats_tube() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "use tubea\r\n");
@@ -1026,9 +921,7 @@ cttest_stats_tube()
     ckrespsub(fd, "\npause-time-left: 0\n");
 }
 
-void
-cttest_ttrlarge()
-{
+void cttest_ttrlarge() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "put 0 0 120 1\r\n");
@@ -1075,9 +968,7 @@ cttest_ttrlarge()
     ckrespsub(fd, "\nttr: 21600\n");
 }
 
-void
-cttest_ttr_small()
-{
+void cttest_ttr_small() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "put 0 0 0 1\r\n");
@@ -1088,9 +979,7 @@ cttest_ttr_small()
     ckrespsub(fd, "\nttr: 1\n");
 }
 
-void
-cttest_zero_delay()
-{
+void cttest_zero_delay() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "put 0 0 1 0\r\n");
@@ -1098,9 +987,7 @@ cttest_zero_delay()
     ckresp(fd, "INSERTED 1\r\n");
 }
 
-void
-cttest_reserve_with_timeout_2conns()
-{
+void cttest_reserve_with_timeout_2conns() {
     int fd0, fd1;
 
     job_data_size_limit = 10;
@@ -1117,9 +1004,7 @@ cttest_reserve_with_timeout_2conns()
     ckresp(fd0, "TIMED_OUT\r\n");
 }
 
-void
-cttest_reserve_ttr_deadline_soon()
-{
+void cttest_reserve_ttr_deadline_soon() {
     int port = SERVER();
     int fd = mustdiallocal(port);
 
@@ -1153,9 +1038,7 @@ cttest_reserve_ttr_deadline_soon()
     ckrespsub(fd, "\nstate: ready\n");
 }
 
-void
-cttest_reserve_job_ttr_deadline_soon()
-{
+void cttest_reserve_job_ttr_deadline_soon() {
     int port = SERVER();
     int fd = mustdiallocal(port);
 
@@ -1201,9 +1084,7 @@ cttest_reserve_job_ttr_deadline_soon()
     ckrespsub(fd, "\nstate: ready\n");
 }
 
-void
-cttest_reserve_job_already_reserved()
-{
+void cttest_reserve_job_already_reserved() {
     int port = SERVER();
     int fd = mustdiallocal(port);
 
@@ -1220,9 +1101,7 @@ cttest_reserve_job_already_reserved()
     ckresp(fd, "NOT_FOUND\r\n");
 }
 
-void
-cttest_reserve_job_ready()
-{
+void cttest_reserve_job_ready() {
     int port = SERVER();
     int fd = mustdiallocal(port);
 
@@ -1249,9 +1128,7 @@ cttest_reserve_job_ready()
     ckresp(fd, "RELEASED\r\n");
 }
 
-void
-cttest_reserve_job_delayed()
-{
+void cttest_reserve_job_delayed() {
     int port = SERVER();
     int fd = mustdiallocal(port);
 
@@ -1278,9 +1155,7 @@ cttest_reserve_job_delayed()
     ckrespsub(fd, "\nstate: ready\n");
 }
 
-void
-cttest_reserve_job_buried()
-{
+void cttest_reserve_job_buried() {
     int port = SERVER();
     int fd = mustdiallocal(port);
 
@@ -1323,12 +1198,9 @@ cttest_reserve_job_buried()
     mustsend(fd, "stats-job 2\r\n");
     ckrespsub(fd, "OK ");
     ckrespsub(fd, "\nstate: ready\n");
-
 }
 
-void
-cttest_release_bad_format()
-{
+void cttest_release_bad_format() {
     int port = SERVER();
     int fd = mustdiallocal(port);
 
@@ -1351,18 +1223,14 @@ cttest_release_bad_format()
     ckresp(fd, "BAD_FORMAT\r\n");
 }
 
-void
-cttest_release_not_found()
-{
+void cttest_release_not_found() {
     int port = SERVER();
     int fd = mustdiallocal(port);
     mustsend(fd, "release 1 1 1\r\n");
     ckresp(fd, "NOT_FOUND\r\n");
 }
 
-void
-cttest_close_releases_job()
-{
+void cttest_close_releases_job() {
     int port = SERVER();
     int cons = mustdiallocal(port);
     int prod = mustdiallocal(port);
@@ -1389,9 +1257,7 @@ cttest_close_releases_job()
     ckresp(prod, "a\r\n");
 }
 
-void
-cttest_quit_releases_job()
-{
+void cttest_quit_releases_job() {
     // This test is similar to the close_releases_job test, except that
     // connection is not closed, but command quit is sent.
     int port = SERVER();
@@ -1420,9 +1286,7 @@ cttest_quit_releases_job()
     ckresp(prod, "a\r\n");
 }
 
-void
-cttest_unpause_tube()
-{
+void cttest_unpause_tube() {
     int fd0, fd1;
 
     int port = SERVER();
@@ -1447,9 +1311,7 @@ cttest_unpause_tube()
     ckresp(fd1, "\r\n");
 }
 
-void
-cttest_list_tube()
-{
+void cttest_list_tube() {
     int port = SERVER();
     int fd0 = mustdiallocal(port);
 
@@ -1461,42 +1323,37 @@ cttest_list_tube()
 
     mustsend(fd0, "list-tubes\r\n");
     ckrespsub(fd0, "OK ");
-    ckresp(fd0,
-           "---\n"
-           "- default\n"
-           "- w\n"
-           "- u\n\r\n");
+    ckresp(fd0, "---\n"
+                "- default\n"
+                "- w\n"
+                "- u\n\r\n");
 
     mustsend(fd0, "list-tube-used\r\n");
     ckresp(fd0, "USING u\r\n");
 
     mustsend(fd0, "list-tubes-watched\r\n");
     ckrespsub(fd0, "OK ");
-    ckresp(fd0,
-           "---\n"
-           "- default\n"
-           "- w\n\r\n");
+    ckresp(fd0, "---\n"
+                "- default\n"
+                "- w\n\r\n");
 
     mustsend(fd0, "ignore default\r\n");
     ckresp(fd0, "WATCHING 1\r\n");
 
     mustsend(fd0, "list-tubes-watched\r\n");
     ckrespsub(fd0, "OK ");
-    ckresp(fd0,
-           "---\n"
-           "- w\n\r\n");
+    ckresp(fd0, "---\n"
+                "- w\n\r\n");
 
     mustsend(fd0, "ignore w\r\n");
     ckresp(fd0, "NOT_IGNORED\r\n");
 }
 
-#define STRING_LEN_200  \
-    "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" \
+#define STRING_LEN_200                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             \
+    "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"                                                                                                                                                                                                                                                                                                                                                                                                         \
     "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
 
-void
-cttest_use_tube_long()
-{
+void cttest_use_tube_long() {
     int port = SERVER();
     int fd0 = mustdiallocal(port);
     // 200 chars is okay
@@ -1507,9 +1364,7 @@ cttest_use_tube_long()
     ckresp(fd0, "BAD_FORMAT\r\n");
 }
 
-void
-cttest_longest_command()
-{
+void cttest_longest_command() {
     int port = SERVER();
     int fd0 = mustdiallocal(port);
     mustsend(fd0, "use " STRING_LEN_200 "\r\n");
@@ -1518,9 +1373,7 @@ cttest_longest_command()
     ckresp(fd0, "PAUSED\r\n");
 }
 
-void
-cttest_binlog_empty_exit()
-{
+void cttest_binlog_empty_exit() {
     srv.wal.dir = ctdir();
     srv.wal.use = 1;
     job_data_size_limit = 10;
@@ -1535,9 +1388,7 @@ cttest_binlog_empty_exit()
     ckresp(fd, "INSERTED 1\r\n");
 }
 
-void
-cttest_binlog_bury()
-{
+void cttest_binlog_bury() {
     srv.wal.dir = ctdir();
     srv.wal.use = 1;
     job_data_size_limit = 10;
@@ -1554,9 +1405,7 @@ cttest_binlog_bury()
     ckresp(fd, "BURIED\r\n");
 }
 
-void
-cttest_binlog_basic()
-{
+void cttest_binlog_basic() {
     srv.wal.dir = ctdir();
     srv.wal.use = 1;
     job_data_size_limit = 10;
@@ -1575,9 +1424,7 @@ cttest_binlog_basic()
     ckresp(fd, "DELETED\r\n");
 }
 
-void
-cttest_binlog_size_limit()
-{
+void cttest_binlog_size_limit() {
     int i = 0;
     int gotsize;
 
@@ -1608,9 +1455,7 @@ cttest_binlog_size_limit()
     free(b2);
 }
 
-void
-cttest_binlog_allocation()
-{
+void cttest_binlog_allocation() {
     int i = 0;
 
     size = 601;
@@ -1637,9 +1482,7 @@ cttest_binlog_allocation()
     }
 }
 
-void
-cttest_binlog_read()
-{
+void cttest_binlog_read() {
     srv.wal.dir = ctdir();
     srv.wal.use = 1;
     srv.wal.syncrate = 0;
@@ -1683,9 +1526,7 @@ cttest_binlog_read()
     ckresp(fd, "NOT_FOUND\r\n");
 }
 
-void
-cttest_binlog_disk_full()
-{
+void cttest_binlog_disk_full() {
     size = 1000;
     falloc = &wrapfalloc;
     fallocpat[0] = 1;
@@ -1747,9 +1588,7 @@ cttest_binlog_disk_full()
     ckresp(fd, "DELETED\r\n");
 }
 
-void
-cttest_binlog_disk_full_delete()
-{
+void cttest_binlog_disk_full_delete() {
     size = 1000;
     falloc = &wrapfalloc;
     fallocpat[0] = 1;
@@ -1815,9 +1654,7 @@ cttest_binlog_disk_full_delete()
     ckresp(fd, "DELETED\r\n");
 }
 
-void
-cttest_binlog_v5()
-{
+void cttest_binlog_v5() {
     char portstr[10];
 
     if (system("which beanstalkd-1.4.6") != 0) {
@@ -1987,9 +1824,7 @@ cttest_binlog_v5()
     ckrespsub(fd, "\nkicks: 0\n");
 }
 
-static void
-bench_put_delete_size(int n, int size, int walsize, int sync, int64 syncrate_ms)
-{
+static void bench_put_delete_size(int n, int size, int walsize, int sync, int64 syncrate_ms) {
     if (walsize > 0) {
         srv.wal.dir = ctdir();
         srv.wal.use = 1;
@@ -2002,7 +1837,7 @@ bench_put_delete_size(int n, int size, int walsize, int sync, int64 syncrate_ms)
     int port = SERVER();
     int fd = mustdiallocal(port);
     char buf[50], put[50];
-    char body[size+1];
+    char body[size + 1];
     memset(body, 'a', size);
     body[size] = 0;
     ctsetbytes(size);
@@ -2021,74 +1856,50 @@ bench_put_delete_size(int n, int size, int walsize, int sync, int64 syncrate_ms)
     ctstoptimer();
 }
 
-void
-ctbench_put_delete_0008(int n)
-{
+void ctbench_put_delete_0008(int n) {
     bench_put_delete_size(n, 8, 0, 0, 0);
 }
 
-void
-ctbench_put_delete_1024(int n)
-{
+void ctbench_put_delete_1024(int n) {
     bench_put_delete_size(n, 1024, 0, 0, 0);
 }
 
-void
-ctbench_put_delete_8192(int n)
-{
+void ctbench_put_delete_8192(int n) {
     bench_put_delete_size(n, 8192, 0, 0, 0);
 }
 
-void
-ctbench_put_delete_81920(int n)
-{
+void ctbench_put_delete_81920(int n) {
     bench_put_delete_size(n, 81920, 0, 0, 0);
 }
 
-void
-ctbench_put_delete_wal_1024_fsync_000ms(int n)
-{
+void ctbench_put_delete_wal_1024_fsync_000ms(int n) {
     bench_put_delete_size(n, 1024, 512000, 1, 0);
 }
 
-void
-ctbench_put_delete_wal_1024_fsync_050ms(int n)
-{
+void ctbench_put_delete_wal_1024_fsync_050ms(int n) {
     bench_put_delete_size(n, 1024, 512000, 1, 50);
 }
 
-void
-ctbench_put_delete_wal_1024_fsync_200ms(int n)
-{
+void ctbench_put_delete_wal_1024_fsync_200ms(int n) {
     bench_put_delete_size(n, 1024, 512000, 1, 200);
 }
 
-void
-ctbench_put_delete_wal_1024_no_fsync(int n)
-{
+void ctbench_put_delete_wal_1024_no_fsync(int n) {
     bench_put_delete_size(n, 1024, 512000, 0, 0);
 }
 
-void
-ctbench_put_delete_wal_8192_fsync_000ms(int n)
-{
+void ctbench_put_delete_wal_8192_fsync_000ms(int n) {
     bench_put_delete_size(n, 8192, 512000, 1, 0);
 }
 
-void
-ctbench_put_delete_wal_8192_fsync_050ms(int n)
-{
+void ctbench_put_delete_wal_8192_fsync_050ms(int n) {
     bench_put_delete_size(n, 8192, 512000, 1, 50);
 }
 
-void
-ctbench_put_delete_wal_8192_fsync_200ms(int n)
-{
+void ctbench_put_delete_wal_8192_fsync_200ms(int n) {
     bench_put_delete_size(n, 8192, 512000, 1, 200);
 }
 
-void
-ctbench_put_delete_wal_8192_no_fsync(int n)
-{
+void ctbench_put_delete_wal_8192_no_fsync(int n) {
     bench_put_delete_size(n, 8192, 512000, 0, 0);
 }

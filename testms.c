@@ -1,15 +1,12 @@
+#include "ct/ct.h"
 #include "dat.h"
 #include <stdint.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
-#include "ct/ct.h"
 
-
-void
-cttest_ms_append()
-{
+void cttest_ms_append() {
     Ms *a = new(struct Ms);
     ms_init(a, NULL, NULL);
 
@@ -29,9 +26,7 @@ cttest_ms_append()
     free(a);
 }
 
-void
-cttest_ms_remove()
-{
+void cttest_ms_remove() {
 
     Ms *a = new(struct Ms);
     ms_init(a, NULL, NULL);
@@ -54,9 +49,7 @@ cttest_ms_remove()
     free(a);
 }
 
-void
-cttest_ms_contains()
-{
+void cttest_ms_contains() {
 
     Ms *a = new(struct Ms);
     ms_init(a, NULL, NULL);
@@ -75,9 +68,7 @@ cttest_ms_contains()
     free(a);
 }
 
-void
-cttest_ms_clear_empty()
-{
+void cttest_ms_clear_empty() {
 
     Ms *a = new(struct Ms);
     ms_init(a, NULL, NULL);
@@ -88,9 +79,7 @@ cttest_ms_clear_empty()
     free(a);
 }
 
-void
-cttest_ms_take()
-{
+void cttest_ms_take() {
     Ms *a = new(struct Ms);
     ms_init(a, NULL, NULL);
 
@@ -114,9 +103,7 @@ cttest_ms_take()
     free(a);
 }
 
-void
-cttest_ms_take_sequence()
-{
+void cttest_ms_take_sequence() {
     size_t i;
     int s[] = {1, 2, 3, 4, 5, 6};
     int e[] = {1, 2, 3, 6, 5, 4};
@@ -124,7 +111,7 @@ cttest_ms_take_sequence()
     Ms *a = new(struct Ms);
     ms_init(a, NULL, NULL);
 
-    size_t n = sizeof(s)/sizeof(s[0]);
+    size_t n = sizeof(s) / sizeof(s[0]);
     for (i = 0; i < n; i++)
         ms_append(a, &s[i]);
 
@@ -136,4 +123,3 @@ cttest_ms_take_sequence()
     free(a->items);
     free(a);
 }
-

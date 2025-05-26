@@ -1,23 +1,22 @@
 /* CT - simple-minded unit testing for C */
 
-#include <signal.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdarg.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <sys/wait.h>
-#include <fcntl.h>
+#include "ct.h"
+#include "internal.h"
 #include <dirent.h>
 #include <errno.h>
-#include <sys/time.h>
-#include <stdint.h>
+#include <fcntl.h>
 #include <inttypes.h>
-#include "internal.h"
-#include "ct.h"
-
+#include <signal.h>
+#include <stdarg.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 static char *curdir;
 static int rjobfd = -1, wjobfd = -1;
@@ -29,33 +28,25 @@ enum { Second = 1000 * 1000 * 1000 };
 enum { BenchTime = Second };
 enum { MaxN = 1000 * 1000 * 1000 };
 
-
-
 #ifdef __MACH__
-#	include <mach/mach_time.h>
+#include <mach/mach_time.h>
 
-static int64
-nstime()
-{
+static int64 nstime() {
     return (int64)mach_absolute_time();
 }
 
 #else
-#	include <time.h>
+#include <time.h>
 
-static int64
-nstime()
-{
+static int64 nstime() {
     struct timespec t;
     clock_gettime(CLOCK_MONOTONIC, &t);
-    return (int64)(t.tv_sec)*Second + t.tv_nsec;
+    return (int64)(t.tv_sec) * Second + t.tv_nsec;
 }
 
 #endif
 
-void
-ctlogpn(const char *p, int n, const char *fmt, ...)
-{
+void ctlogpn(const char *p, int n, const char *fmt, ...) {
     va_list arg;
 
     printf("%s:%d: ", p, n);
@@ -65,67 +56,43 @@ ctlogpn(const char *p, int n, const char *fmt, ...)
     putchar('\n');
 }
 
-
-void
-ctfail(void)
-{
+void ctfail(void) {
     fail = 1;
 }
 
-
-void
-ctfailnow(void)
-{
+void ctfailnow(void) {
     fflush(NULL);
     abort();
 }
 
-
-char *
-ctdir(void)
-{
+char *ctdir(void) {
     return curdir;
 }
 
-
-void
-ctresettimer(void)
-{
+void ctresettimer(void) {
     bdur = 0;
     bstart = nstime();
 }
 
-
-void
-ctstarttimer(void)
-{
+void ctstarttimer(void) {
     if (!btiming) {
         bstart = nstime();
         btiming = 1;
     }
 }
 
-
-void
-ctstoptimer(void)
-{
+void ctstoptimer(void) {
     if (btiming) {
         bdur += nstime() - bstart;
         btiming = 0;
     }
 }
 
-
-void
-ctsetbytes(int n)
-{
+void ctsetbytes(int n) {
     bbytes = (int64)n;
 }
 
-
-static void
-die(int code, int err, const char *msg)
-{
+static void die(int code, int err, const char *msg) {
     putc('\n', stderr);
 
     if (msg && *msg) {
@@ -138,10 +105,7 @@ die(int code, int err, const char *msg)
     exit(code);
 }
 
-
-static int
-tmpfd(void)
-{
+static int tmpfd(void) {
     FILE *f = tmpfile();
     if (!f) {
         die(1, errno, "tmpfile");
@@ -149,17 +113,11 @@ tmpfd(void)
     return fileno(f);
 }
 
-
-static int
-failed(int s)
-{
+static int failed(int s) {
     return WIFSIGNALED(s) && (WTERMSIG(s) == SIGABRT);
 }
 
-
-static void
-waittest(Test *ts)
-{
+static void waittest(Test *ts) {
     Test *t;
     int pid, stat;
 
@@ -169,7 +127,7 @@ waittest(Test *ts)
     }
     killpg(pid, SIGKILL);
 
-    for (t=ts; t->f; t++) {
+    for (t = ts; t->f; t++) {
         if (t->pid == pid) {
             t->status = stat;
             if (!t->status) {
@@ -184,14 +142,11 @@ waittest(Test *ts)
     }
 }
 
-
-static void
-start(Test *t)
-{
+static void start(Test *t) {
     t->fd = tmpfd();
     strcpy(t->dir, TmpDirPat);
     if (mkdtemp(t->dir) == NULL) {
-	die(1, errno, "mkdtemp");
+        die(1, errno, "mkdtemp");
     }
     fflush(NULL);
     t->pid = fork();
@@ -218,13 +173,10 @@ start(Test *t)
     setpgid(t->pid, t->pid);
 }
 
-
-static void
-runalltest(Test *ts, int limit)
-{
+static void runalltest(Test *ts, int limit) {
     int nrun = 0;
     Test *t;
-    for (t=ts; t->f; t++) {
+    for (t = ts; t->f; t++) {
         if (nrun >= limit) {
             waittest(ts);
             nrun--;
@@ -237,10 +189,7 @@ runalltest(Test *ts, int limit)
     }
 }
 
-
-static void
-copyfd(FILE *out, int in)
-{
+static void copyfd(FILE *out, int in) {
     ssize_t n;
     char buf[1024]; /* arbitrary size */
 
@@ -251,15 +200,12 @@ copyfd(FILE *out, int in)
     }
 }
 
-
 /*
 Removes path and all of its children.
 Writes errors to stderr and keeps going.
 If path doesn't exist, rmtree returns silently.
 */
-static void
-rmtree(char *path)
-{
+static void rmtree(char *path) {
     int r = unlink(path);
     if (r == 0 || errno == ENOENT) {
         return; /* success */
@@ -282,7 +228,7 @@ rmtree(char *path)
             continue;
         }
         int n = strlen(path) + 1 + strlen(ent->d_name);
-        char s[n+1];
+        char s[n + 1];
         sprintf(s, "%s/%s", path, ent->d_name);
         rmtree(s);
     }
@@ -294,15 +240,12 @@ rmtree(char *path)
     }
 }
 
-
-static void
-runbenchn(Benchmark *b, int n)
-{
+static void runbenchn(Benchmark *b, int n) {
     int outfd = tmpfd();
     int durfd = tmpfd();
     strcpy(b->dir, TmpDirPat);
     if (mkdtemp(b->dir) == NULL) {
-	die(1, errno, "mkdtemp");
+        die(1, errno, "mkdtemp");
     }
     fflush(NULL);
     int pid = fork();
@@ -359,11 +302,8 @@ runbenchn(Benchmark *b, int n)
     }
 }
 
-
 /* rounddown10 rounds a number down to the nearest power of 10. */
-static int
-rounddown10(int n)
-{
+static int rounddown10(int n) {
     int tens = 0;
     /* tens = floor(log_10(n)) */
     while (n >= 10) {
@@ -378,47 +318,35 @@ rounddown10(int n)
     return result;
 }
 
-
 /* roundup rounds n up to a number of the form [1eX, 2eX, 5eX]. */
-static int
-roundup(int n)
-{
+static int roundup(int n) {
     int base = rounddown10(n);
     if (n <= base)
         return base;
-    if (n <= 2*base)
-        return 2*base;
-    if (n <= 3*base)
-        return 3*base;
-    if (n <= 5*base)
-        return 5*base;
-    return 10*base;
+    if (n <= 2 * base)
+        return 2 * base;
+    if (n <= 3 * base)
+        return 3 * base;
+    if (n <= 5 * base)
+        return 5 * base;
+    return 10 * base;
 }
 
-
-static int
-min(int a, int b)
-{
+static int min(int a, int b) {
     if (a < b) {
         return a;
     }
     return b;
 }
 
-
-static int
-max(int a, int b)
-{
+static int max(int a, int b) {
     if (a > b) {
         return a;
     }
     return b;
 }
 
-
-static void
-runbench(Benchmark *b)
-{
+static void runbench(Benchmark *b) {
     printf("%s\t", b->name);
     fflush(stdout);
     int n = 1;
@@ -435,19 +363,19 @@ runbench(Benchmark *b)
         /* Run more iterations than we think we'll need for a second (1.2x).
         Don't grow too fast in case we had timing errors previously.
         Be sure to run at least one more than last time. */
-        n = max(min(n+n/5, 100*last), last+1);
+        n = max(min(n + n / 5, 100 * last), last + 1);
         /* Round up to something easy to read. */
         n = roundup(n);
         runbenchn(b, n);
     }
     if (b->status == 0) {
-        printf("%8d\t%10" PRId64 " ns/op", n, b->dur/n);
+        printf("%8d\t%10" PRId64 " ns/op", n, b->dur / n);
         if (b->bytes > 0) {
             double mbs = 0;
             if (b->dur > 0) {
                 int64 sec = b->dur / 1000L / 1000L / 1000L;
                 int64 nsec = b->dur % 1000000000L;
-                double dur = (double)sec + (double)nsec*.0000000001;
+                double dur = (double)sec + (double)nsec * .0000000001;
                 mbs = ((double)b->bytes * (double)n / 1000000) / dur;
             }
             printf("\t%7.2f MB/s", mbs);
@@ -469,19 +397,13 @@ runbench(Benchmark *b)
     }
 }
 
-
-static void
-runallbench(Benchmark *b)
-{
+static void runallbench(Benchmark *b) {
     for (; b->f; b++) {
         runbench(b);
     }
 }
 
-
-static int
-report(Test *t)
-{
+static int report(Test *t) {
     int nfail = 0, nerr = 0;
 
     putchar('\n');
@@ -519,21 +441,18 @@ report(Test *t)
     return nfail || nerr;
 }
 
-
-static int
-readtokens()
-{
+static int readtokens() {
     int n = 1;
     char c, *s;
     char *v = getenv("MAKEFLAGS");
     if (v == NULL)
         return n;
     if ((s = strstr(v, " --jobserver-fds="))) {
-        rjobfd = (int)strtol(s+17, &s, 10);  /* skip " --jobserver-fds=" */
-        wjobfd = (int)strtol(s+1, NULL, 10); /* skip comma */
+        rjobfd = (int)strtol(s + 17, &s, 10);  /* skip " --jobserver-fds=" */
+        wjobfd = (int)strtol(s + 1, NULL, 10); /* skip comma */
     }
     if (rjobfd >= 0) {
-        fcntl(rjobfd, F_SETFL, fcntl(rjobfd, F_GETFL)|O_NONBLOCK);
+        fcntl(rjobfd, F_SETFL, fcntl(rjobfd, F_GETFL) | O_NONBLOCK);
         while (read(rjobfd, &c, 1) > 0) {
             n++;
         }
@@ -541,14 +460,11 @@ readtokens()
     return n;
 }
 
-
-static void
-writetokens(int n)
-{
+static void writetokens(int n) {
     char c = '+';
     if (wjobfd >= 0) {
-        fcntl(wjobfd, F_SETFL, fcntl(wjobfd, F_GETFL)|O_NONBLOCK);
-        for (; n>1; n--) {
+        fcntl(wjobfd, F_SETFL, fcntl(wjobfd, F_GETFL) | O_NONBLOCK);
+        for (; n > 1; n--) {
             if (write(wjobfd, &c, 1) != 1) {
                 /* ignore error; nothing we can do anyway */
             }
@@ -556,10 +472,7 @@ writetokens(int n)
     }
 }
 
-
-int
-main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     int n = readtokens();
     runalltest(ctmaintest, n);
     writetokens(n);

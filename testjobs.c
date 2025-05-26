@@ -1,16 +1,14 @@
 #include "ct/ct.h"
 #include "dat.h"
 #include <stdint.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
 
 static Tube *default_tube;
 
-void
-cttest_job_creation()
-{
+void cttest_job_creation() {
     Job *j;
 
     TUBE_ASSIGN(default_tube, make_tube("default"));
@@ -18,9 +16,7 @@ cttest_job_creation()
     assertf(j->r.pri == 1, "priority should match");
 }
 
-void
-cttest_job_cmp_pris()
-{
+void cttest_job_cmp_pris() {
     Job *a, *b;
 
     TUBE_ASSIGN(default_tube, make_tube("default"));
@@ -30,9 +26,7 @@ cttest_job_cmp_pris()
     assertf(job_pri_less(a, b), "should be less");
 }
 
-void
-cttest_job_cmp_ids()
-{
+void cttest_job_cmp_ids() {
     Job *a, *b;
 
     TUBE_ASSIGN(default_tube, make_tube("default"));
@@ -43,9 +37,7 @@ cttest_job_cmp_ids()
     assertf(job_pri_less(a, b), "should be less");
 }
 
-void
-cttest_job_large_pris()
-{
+void cttest_job_large_pris() {
     Job *a, *b;
 
     TUBE_ASSIGN(default_tube, make_tube("default"));
@@ -60,9 +52,7 @@ cttest_job_large_pris()
     assertf(!job_pri_less(a, b), "should not be less");
 }
 
-void
-cttest_job_hash_free()
-{
+void cttest_job_hash_free() {
     Job *j;
     uint64 jid = 83;
 
@@ -73,9 +63,7 @@ cttest_job_hash_free()
     assertf(!job_find(jid), "job should be missing");
 }
 
-void
-cttest_job_hash_free_next()
-{
+void cttest_job_hash_free_next() {
     Job *a, *b;
     uint64 aid = 97, bid = 12386;
 
@@ -90,9 +78,7 @@ cttest_job_hash_free_next()
     assertf(a->ht_next == NULL, "job should be missing");
 }
 
-void
-cttest_job_all_jobs_used()
-{
+void cttest_job_all_jobs_used() {
     Job *j, *x;
 
     TUBE_ASSIGN(default_tube, make_tube("default"));
@@ -109,9 +95,7 @@ cttest_job_all_jobs_used()
     assertf(get_all_jobs_used() == 0, "should match");
 }
 
-void
-cttest_job_100_000_jobs()
-{
+void cttest_job_100_000_jobs() {
     int i;
 
     TUBE_ASSIGN(default_tube, make_tube("default"));
@@ -127,9 +111,7 @@ cttest_job_100_000_jobs()
     assertf(get_all_jobs_used() == 0, "should match");
 }
 
-void
-ctbench_job_make(int n)
-{
+void ctbench_job_make(int n) {
     int i;
     Job **j = calloc(n, sizeof *j);
     TUBE_ASSIGN(default_tube, make_tube("default"));
@@ -146,9 +128,7 @@ ctbench_job_make(int n)
     free(j);
 }
 
-void
-ctbench_job_free(int n)
-{
+void ctbench_job_free(int n) {
     int i;
     Job **j = calloc(n, sizeof *j);
     TUBE_ASSIGN(default_tube, make_tube("default"));

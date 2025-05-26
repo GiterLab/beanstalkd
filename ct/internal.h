@@ -9,19 +9,19 @@ typedef struct Benchmark Benchmark;
 struct Test {
     void (*f)(void);
     const char *name;
-    int  status;
-    int  fd;
-    int  pid;
+    int status;
+    int fd;
+    int pid;
     char dir[sizeof TmpDirPat];
 };
 
 struct Benchmark {
-    void  (*f)(int);
-    const char  *name;
-    int   status;
+    void (*f)(int);
+    const char *name;
+    int status;
     int64 dur;
     int64 bytes;
-    char  dir[sizeof TmpDirPat];
+    char dir[sizeof TmpDirPat];
 };
 
 extern Test ctmaintest[];

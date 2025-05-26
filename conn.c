@@ -13,34 +13,28 @@ static int cur_conn_ct = 0, cur_worker_ct = 0, cur_producer_ct = 0;
 static uint tot_conn_ct = 0;
 int verbose = 0;
 
-static void
-on_watch(Ms *a, Tube *t, size_t i)
-{
+static void on_watch(Ms *a, Tube *t, size_t i) {
     UNUSED_PARAMETER(a);
     UNUSED_PARAMETER(i);
     tube_iref(t);
     t->watching_ct++;
 }
 
-static void
-on_ignore(Ms *a, Tube *t, size_t i)
-{
+static void on_ignore(Ms *a, Tube *t, size_t i) {
     UNUSED_PARAMETER(a);
     UNUSED_PARAMETER(i);
     t->watching_ct--;
     tube_dref(t);
 }
 
-Conn *
-make_conn(int fd, char start_state, Tube *use, Tube *watch)
-{
+Conn *make_conn(int fd, char start_state, Tube *use, Tube *watch) {
     Conn *c = new(Conn);
     if (!c) {
         twarn("OOM");
         return NULL;
     }
 
-    ms_init(&c->watch, (ms_event_fn) on_watch, (ms_event_fn) on_ignore);
+    ms_init(&c->watch, (ms_event_fn)on_watch, (ms_event_fn)on_ignore);
     if (!ms_append(&c->watch, watch)) {
         free(c);
         twarn("OOM");
@@ -65,57 +59,42 @@ make_conn(int fd, char start_state, Tube *use, Tube *watch)
     return c;
 }
 
-void
-connsetproducer(Conn *c)
-{
-    if (c->type & CONN_TYPE_PRODUCER) return;
+void connsetproducer(Conn *c) {
+    if (c->type & CONN_TYPE_PRODUCER)
+        return;
     c->type |= CONN_TYPE_PRODUCER;
     cur_producer_ct++; /* stats */
 }
 
-void
-connsetworker(Conn *c)
-{
-    if (c->type & CONN_TYPE_WORKER) return;
+void connsetworker(Conn *c) {
+    if (c->type & CONN_TYPE_WORKER)
+        return;
     c->type |= CONN_TYPE_WORKER;
     cur_worker_ct++; /* stats */
 }
 
-int
-count_cur_conns()
-{
+int count_cur_conns() {
     return cur_conn_ct;
 }
 
-uint
-count_tot_conns()
-{
+uint count_tot_conns() {
     return tot_conn_ct;
 }
 
-int
-count_cur_producers()
-{
+int count_cur_producers() {
     return cur_producer_ct;
 }
 
-int
-count_cur_workers()
-{
+int count_cur_workers() {
     return cur_worker_ct;
 }
 
-static int
-has_reserved_job(Conn *c)
-{
+static int has_reserved_job(Conn *c) {
     return !job_list_is_empty(&c->reserved_jobs);
 }
 
-
 // Returns positive nanoseconds when c should tick, 0 otherwise.
-static int64
-conntickat(Conn *c)
-{
+static int64 conntickat(Conn *c) {
     int margin = 0, should_timeout = 0;
     int64 t = INT64_MAX;
 
@@ -138,12 +117,9 @@ conntickat(Conn *c)
     return 0;
 }
 
-
 // Remove c from the c->srv heap and reschedule it using the value
 // returned by conntickat if there is an outstanding timeout in the c.
-void
-connsched(Conn *c)
-{
+void connsched(Conn *c) {
     if (c->in_conns) {
         heapremove(&c->srv->conns, c->tickpos);
         c->in_conns = 0;
@@ -157,8 +133,7 @@ connsched(Conn *c)
 
 // conn_set_soonestjob updates c->soonest_job with j
 // if j should be handled sooner than c->soonest_job.
-static void
-conn_set_soonestjob(Conn *c, Job *j) {
+static void conn_set_soonestjob(Conn *c, Job *j) {
     if (!c->soonest_job || j->r.deadline_at < c->soonest_job->r.deadline_at) {
         c->soonest_job = j;
     }
@@ -166,9 +141,7 @@ conn_set_soonestjob(Conn *c, Job *j) {
 
 // Return the reserved job with the earliest deadline,
 // or NULL if there's no reserved job.
-Job *
-connsoonestjob(Conn *c)
-{
+Job *connsoonestjob(Conn *c) {
     // use cached value and bail out.
     if (c->soonest_job != NULL)
         return c->soonest_job;
@@ -180,8 +153,7 @@ connsoonestjob(Conn *c)
     return c->soonest_job;
 }
 
-void
-conn_reserve_job(Conn *c, Job *j) {
+void conn_reserve_job(Conn *c, Job *j) {
     j->tube->stat.reserved_ct++;
     j->r.reserve_ct++;
 
@@ -195,47 +167,34 @@ conn_reserve_job(Conn *c, Job *j) {
 
 // Return true if c has a reserved job with less than one second until its
 // deadline.
-int
-conndeadlinesoon(Conn *c)
-{
+int conndeadlinesoon(Conn *c) {
     int64 t = nanoseconds();
     Job *j = connsoonestjob(c);
 
     return j && t >= j->r.deadline_at - SAFETY_MARGIN;
 }
 
-int
-conn_ready(Conn *c)
-{
+int conn_ready(Conn *c) {
     size_t i;
 
     for (i = 0; i < c->watch.len; i++) {
-        if (((Tube *) c->watch.items[i])->ready.len)
+        if (((Tube *)c->watch.items[i])->ready.len)
             return 1;
     }
     return 0;
 }
 
-
-int
-conn_less(void *ca, void *cb)
-{
+int conn_less(void *ca, void *cb) {
     Conn *a = (Conn *)ca;
     Conn *b = (Conn *)cb;
     return a->tickat < b->tickat;
 }
 
-
-void
-conn_setpos(void *c, size_t i)
-{
+void conn_setpos(void *c, size_t i) {
     ((Conn *)c)->tickpos = i;
 }
 
-
-void
-connclose(Conn *c)
-{
+void connclose(Conn *c) {
     sockwant(&c->sock, 0);
     close(c->sock.fd);
     if (verbose) {
@@ -251,8 +210,10 @@ connclose(Conn *c)
     c->in_job = c->out_job = NULL;
     c->in_job_read = 0;
 
-    if (c->type & CONN_TYPE_PRODUCER) cur_producer_ct--; /* stats */
-    if (c->type & CONN_TYPE_WORKER) cur_worker_ct--; /* stats */
+    if (c->type & CONN_TYPE_PRODUCER)
+        cur_producer_ct--; /* stats */
+    if (c->type & CONN_TYPE_WORKER)
+        cur_worker_ct--; /* stats */
 
     cur_conn_ct--; /* stats */
 

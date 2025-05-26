@@ -1,23 +1,21 @@
 #include "dat.h"
-#include <netdb.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <string.h>
 #include <errno.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/stat.h>
+#include <fcntl.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/un.h>
+#include <unistd.h>
 
 #ifdef HAVE_LIBSYSTEMD
 #include <systemd/sd-daemon.h>
 #endif
 
-static int
-set_nonblocking(int fd)
-{
+static int set_nonblocking(int fd) {
     int flags, r;
 
     flags = fcntl(fd, F_GETFL, 0);
@@ -33,9 +31,7 @@ set_nonblocking(int fd)
     return 0;
 }
 
-static int
-make_inet_socket(char *host, char *port)
-{
+static int make_inet_socket(char *host, char *port) {
     int fd = -1, flags, r;
     struct linger linger = {0, 0};
     struct addrinfo *airoot, *ai, hints;
@@ -111,12 +107,9 @@ make_inet_socket(char *host, char *port)
             socklen_t addrlen;
 
             addrlen = sizeof(addr);
-            r = getsockname(fd, (struct sockaddr *) &addr, &addrlen);
+            r = getsockname(fd, (struct sockaddr *)&addr, &addrlen);
             if (!r) {
-                r = getnameinfo((struct sockaddr *) &addr, addrlen,
-                                hbuf, sizeof(hbuf),
-                                pbuf, sizeof(pbuf),
-                                NI_NUMERICHOST|NI_NUMERICSERV);
+                r = getnameinfo((struct sockaddr *)&addr, addrlen, hbuf, sizeof(hbuf), pbuf, sizeof(pbuf), NI_NUMERICHOST | NI_NUMERICSERV);
                 if (!r) {
                     h = hbuf;
                     p = pbuf;
@@ -141,15 +134,13 @@ make_inet_socket(char *host, char *port)
 
     freeaddrinfo(airoot);
 
-    if(ai == NULL)
+    if (ai == NULL)
         fd = -1;
 
     return fd;
 }
 
-static int
-make_unix_socket(char *path)
-{
+static int make_unix_socket(char *path) {
     int fd = -1, r;
     struct stat st;
     struct sockaddr_un addr;
@@ -158,8 +149,7 @@ make_unix_socket(char *path)
     memset(&addr, 0, sizeof(struct sockaddr_un));
     addr.sun_family = AF_UNIX;
     if (strlen(path) > maxlen) {
-        warnx("socket path %s is too long (%ld characters), where maximum allowed is %ld",
-              path, strlen(path), maxlen);
+        warnx("socket path %s is too long (%ld characters), where maximum allowed is %ld", path, strlen(path), maxlen);
         return -1;
     }
     strncpy(addr.sun_path, path, maxlen);
@@ -191,7 +181,7 @@ make_unix_socket(char *path)
         return -1;
     }
 
-    r = bind(fd, (struct sockaddr *) &addr, sizeof(struct sockaddr_un));
+    r = bind(fd, (struct sockaddr *)&addr, sizeof(struct sockaddr_un));
     if (r == -1) {
         twarn("bind()");
         close(fd);
@@ -211,9 +201,7 @@ make_unix_socket(char *path)
     return fd;
 }
 
-int
-make_server_socket(char *host, char *port)
-{
+int make_server_socket(char *host, char *port) {
 #ifdef HAVE_LIBSYSTEMD
     int fd = -1, r;
 

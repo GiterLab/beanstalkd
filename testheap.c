@@ -1,15 +1,12 @@
+#include "ct/ct.h"
 #include "dat.h"
 #include <stdint.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
-#include "ct/ct.h"
 
-
-void
-cttest_heap_insert_one()
-{
+void cttest_heap_insert_one() {
     Heap h = {
         .less = job_pri_less,
         .setpos = job_setpos,
@@ -27,9 +24,7 @@ cttest_heap_insert_one()
     free(h.data);
 }
 
-void
-cttest_heap_insert_and_remove_one()
-{
+void cttest_heap_insert_and_remove_one() {
     Heap h = {
         .less = job_pri_less,
         .setpos = job_setpos,
@@ -49,9 +44,7 @@ cttest_heap_insert_and_remove_one()
     job_free(j1);
 }
 
-void
-cttest_heap_priority()
-{
+void cttest_heap_priority() {
     Heap h = {
         .less = job_pri_less,
         .setpos = job_setpos,
@@ -98,9 +91,7 @@ cttest_heap_priority()
     job_free(j3);
 }
 
-void
-cttest_heap_fifo_property()
-{
+void cttest_heap_fifo_property() {
     Heap h = {
         .less = job_pri_less,
         .setpos = job_setpos,
@@ -150,9 +141,7 @@ cttest_heap_fifo_property()
     job_free(j3c);
 }
 
-void
-cttest_heap_many_jobs()
-{
+void cttest_heap_many_jobs() {
     Heap h = {
         .less = job_pri_less,
         .setpos = job_setpos,
@@ -179,9 +168,7 @@ cttest_heap_many_jobs()
     free(h.data);
 }
 
-void
-cttest_heap_remove_k()
-{
+void cttest_heap_remove_k() {
     Heap h = {
         .less = job_pri_less,
         .setpos = job_setpos,
@@ -216,9 +203,7 @@ cttest_heap_remove_k()
     free(h.data);
 }
 
-void
-ctbench_heap_insert(int n)
-{
+void ctbench_heap_insert(int n) {
     Job **j = calloc(n, sizeof *j);
     int i;
     for (i = 0; i < n; i++) {
@@ -243,9 +228,7 @@ ctbench_heap_insert(int n)
     free(j);
 }
 
-void
-ctbench_heap_remove(int n)
-{
+void ctbench_heap_remove(int n) {
     Heap h = {
         .less = job_pri_less,
         .setpos = job_setpos,

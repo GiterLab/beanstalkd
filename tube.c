@@ -5,9 +5,7 @@
 
 struct Ms tubes;
 
-Tube *
-make_tube(const char *name)
-{
+Tube *make_tube(const char *name) {
     Tube *t = new(Tube);
     if (!t)
         return NULL;
@@ -31,9 +29,7 @@ make_tube(const char *name)
     return t;
 }
 
-static void
-tube_free(Tube *t)
-{
+static void tube_free(Tube *t) {
     ms_remove(&tubes, t);
     free(t->ready.data);
     free(t->delay.data);
@@ -41,10 +37,9 @@ tube_free(Tube *t)
     free(t);
 }
 
-void
-tube_dref(Tube *t)
-{
-    if (!t) return;
+void tube_dref(Tube *t) {
+    if (!t)
+        return;
     if (t->refs < 1) {
         twarnx("refs is zero for tube: %s", t->name);
         return;
@@ -55,16 +50,13 @@ tube_dref(Tube *t)
         tube_free(t);
 }
 
-void
-tube_iref(Tube *t)
-{
-    if (!t) return;
+void tube_iref(Tube *t) {
+    if (!t)
+        return;
     ++t->refs;
 }
 
-static Tube *
-make_and_insert_tube(const char *name)
-{
+static Tube *make_and_insert_tube(const char *name) {
     int r;
     Tube *t = NULL;
 
@@ -76,14 +68,12 @@ make_and_insert_tube(const char *name)
      * increment the ref count. */
     r = ms_append(&tubes, t);
     if (!r)
-        return tube_dref(t), (Tube *) 0;
+        return tube_dref(t), (Tube *)0;
 
     return t;
 }
 
-Tube *
-tube_find(Ms *tubeset, const char *name)
-{
+Tube *tube_find(Ms *tubeset, const char *name) {
     size_t i;
 
     for (i = 0; i < tubeset->len; i++) {
@@ -94,12 +84,9 @@ tube_find(Ms *tubeset, const char *name)
     return NULL;
 }
 
-Tube *
-tube_find_or_make(const char *name)
-{
+Tube *tube_find_or_make(const char *name) {
     Tube *t = tube_find(&tubes, name);
     if (t)
         return t;
     return make_and_insert_tube(name);
 }
-

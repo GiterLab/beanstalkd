@@ -41,7 +41,6 @@ See http://github.com/rtomayko/ronn.
 - `adm` - files useful for system administrators
 - `ct` - testing tool; vendored from https://github.com/kr/ct
 - `doc` - documentation
-- `pkg` - scripts to make releases
 
 ## Tests
 

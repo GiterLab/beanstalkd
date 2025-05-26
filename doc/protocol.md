@@ -38,7 +38,7 @@ the server will reply with one of the following error messages:
 
 - `"INTERNAL_ERROR\r\n"` This indicates a bug in the server. It should never
    happen. If it does happen, please report it at
-   http://groups.google.com/group/beanstalk-talk.
+   <http://groups.google.com/group/beanstalk-talk>.
 
 - `"BAD_FORMAT\r\n"` The client sent a command line that was not well-formed.
    This can happen if the line's length exceeds 224 bytes including \r\n,

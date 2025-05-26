@@ -1,13 +1,13 @@
 #define _XOPEN_SOURCE 600
 
 #include "dat.h"
-#include <unistd.h>
-#include <sys/types.h>
-#include <stdint.h>
-#include <fcntl.h>
-#include <stdlib.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <stdint.h>
+#include <stdlib.h>
 #include <sys/epoll.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #ifndef EPOLLRDHUP
 #define EPOLLRDHUP 0x2000
@@ -15,10 +15,7 @@
 
 static int epfd;
 
-
-int
-sockinit(void)
-{
+int sockinit(void) {
     epfd = epoll_create(1);
     if (epfd == -1) {
         twarn("epoll_create");
@@ -27,10 +24,7 @@ sockinit(void)
     return 0;
 }
 
-
-int
-sockwant(Socket *s, int rw)
-{
+int sockwant(Socket *s, int rw) {
     int op;
 
     if (!s->added && !rw) {
@@ -44,7 +38,7 @@ sockwant(Socket *s, int rw)
         op = EPOLL_CTL_MOD;
     }
 
-    struct epoll_event ev = {.events=0};
+    struct epoll_event ev = {.events = 0};
     switch (rw) {
     case 'r':
         ev.events = EPOLLIN;
@@ -59,14 +53,11 @@ sockwant(Socket *s, int rw)
     return epoll_ctl(epfd, op, s->fd, &ev);
 }
 
-
-int
-socknext(Socket **s, int64 timeout)
-{
+int socknext(Socket **s, int64 timeout) {
     int r;
-    struct epoll_event ev = {.events=0};
+    struct epoll_event ev = {.events = 0};
 
-    r = epoll_wait(epfd, &ev, 1, (int)(timeout/1000000));
+    r = epoll_wait(epfd, &ev, 1, (int)(timeout / 1000000));
     if (r == -1 && errno != EINTR) {
         twarn("epoll_wait");
         exit(1);
@@ -74,7 +65,7 @@ socknext(Socket **s, int64 timeout)
 
     if (r > 0) {
         *s = ev.data.ptr;
-        if (ev.events & (EPOLLHUP|EPOLLRDHUP)) {
+        if (ev.events & (EPOLLHUP | EPOLLRDHUP)) {
             return 'h';
         } else if (ev.events & EPOLLIN) {
             return 'r';

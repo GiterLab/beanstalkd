@@ -6,11 +6,12 @@
 struct Server srv = {
     .port = Portdef,
     .password = NULL,
-    .wal = {
-        .filesize = Filesizedef,
-        .wantsync = 1,
-        .syncrate = DEFAULT_FSYNC_MS * 1000000,
-    },
+    .wal =
+        {
+            .filesize = Filesizedef,
+            .wantsync = 1,
+            .syncrate = DEFAULT_FSYNC_MS * 1000000,
+        },
 };
 
 // srv_acquire_wal tries to lock the wal dir specified by s->wal and
@@ -26,7 +27,7 @@ void srv_acquire_wal(Server *s) {
             exit(10);
         }
 
-        Job list = {.prev=NULL, .next=NULL};
+        Job list = {.prev = NULL, .next = NULL};
         list.prev = list.next = &list;
         walinit(&s->wal, &list);
         int ok = prot_replay(s, &list);
@@ -37,9 +38,7 @@ void srv_acquire_wal(Server *s) {
     }
 }
 
-void
-srvserve(Server *s)
-{
+void srvserve(Server *s) {
     Socket *sock;
 
     if (sockinit() == -1) {
@@ -72,8 +71,6 @@ srvserve(Server *s)
     }
 }
 
-void
-srvaccept(Server *s, int ev)
-{
+void srvaccept(Server *s, int ev) {
     h_accept(s->sock.fd, ev, s);
 }

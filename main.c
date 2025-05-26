@@ -1,18 +1,16 @@
 #include "dat.h"
-#include <stdint.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <pwd.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <pwd.h>
-#include <fcntl.h>
 
-static void
-su(const char *user) 
-{
+static void su(const char *user) {
     errno = 0;
     struct passwd *pwent = getpwnam(user);
     if (errno) {
@@ -37,15 +35,11 @@ su(const char *user)
     }
 }
 
-static void
-handle_sigterm_pid1(int _unused)
-{
+static void handle_sigterm_pid1(int _unused) {
     exit(143);
 }
 
-static void
-set_sig_handlers()
-{
+static void set_sig_handlers() {
     struct sigaction sa;
 
     sa.sa_handler = SIG_IGN;
@@ -82,9 +76,7 @@ set_sig_handlers()
     }
 }
 
-static const char *
-get_port_from_env()
-{
+static const char *get_port_from_env() {
     const char *port = getenv("BEANSTALKD_PORT");
     if (!port) {
         port = "11300"; // default port
@@ -95,9 +87,7 @@ get_port_from_env()
     return port;
 }
 
-static const char *
-get_password_from_env()
-{
+static const char *get_password_from_env() {
     const char *password = getenv("BEANSTALKD_PASSWORD");
     if (password && strlen(password) > MAX_PASSWORD_LEN - 1) {
         twarnx("BEANSTALKD_PASSWORD is too long, maximum length is %d", MAX_PASSWORD_LEN - 1);
@@ -106,9 +96,7 @@ get_password_from_env()
     return password;
 }
 
-int
-main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     // load the server configuration
     srv.port = (char *)get_port_from_env();
     srv.password = (char *)get_password_from_env();
@@ -129,7 +117,7 @@ main(int argc, char **argv)
 
     progname = argv[0];
     setlinebuf(stdout);
-    optparse(&srv, argv+1);
+    optparse(&srv, argv + 1);
 
     if (verbose) {
         printf("pid %d\n", getpid());

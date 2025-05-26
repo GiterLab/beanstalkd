@@ -1,0 +1,8 @@
+{
+    BasedOnStyle: LLVM,
+    IndentWidth: 4,
+    ColumnLimit: 500,
+    AllowShortCaseLabelsOnASingleLine: false,
+    AllowShortFunctionsOnASingleLine: None,
+    AlignConsecutiveMacros: true,
+}

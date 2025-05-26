@@ -1,20 +1,16 @@
 #include "dat.h"
 #include <stdint.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 
-void
-ms_init(Ms *a, ms_event_fn oninsert, ms_event_fn onremove)
-{
+void ms_init(Ms *a, ms_event_fn oninsert, ms_event_fn onremove) {
     a->len = a->cap = a->last = 0;
     a->items = NULL;
     a->oninsert = oninsert;
     a->onremove = onremove;
 }
 
-static int
-grow(Ms *a)
-{
+static int grow(Ms *a) {
     void **nitems;
     size_t ncap = a->cap << 1;
     if (!ncap)
@@ -31,9 +27,7 @@ grow(Ms *a)
     return 1;
 }
 
-int
-ms_append(Ms *a, void *item)
-{
+int ms_append(Ms *a, void *item) {
     if (a->len >= a->cap && !grow(a))
         return 0;
 
@@ -43,9 +37,7 @@ ms_append(Ms *a, void *item)
     return 1;
 }
 
-static int
-ms_delete(Ms *a, size_t i)
-{
+static int ms_delete(Ms *a, size_t i) {
     void *item;
 
     if (i >= a->len)
@@ -59,17 +51,14 @@ ms_delete(Ms *a, size_t i)
     return 1;
 }
 
-void
-ms_clear(Ms *a)
-{
-    while (ms_delete(a, 0));
+void ms_clear(Ms *a) {
+    while (ms_delete(a, 0))
+        ;
     free(a->items);
     ms_init(a, a->oninsert, a->onremove);
 }
 
-int
-ms_remove(Ms *a, void *item)
-{
+int ms_remove(Ms *a, void *item) {
     size_t i;
 
     for (i = 0; i < a->len; i++) {
@@ -79,9 +68,7 @@ ms_remove(Ms *a, void *item)
     return 0;
 }
 
-int
-ms_contains(Ms *a, void *item)
-{
+int ms_contains(Ms *a, void *item) {
     size_t i;
 
     for (i = 0; i < a->len; i++) {
@@ -91,9 +78,7 @@ ms_contains(Ms *a, void *item)
     return 0;
 }
 
-void *
-ms_take(Ms *a)
-{
+void *ms_take(Ms *a) {
     void *item;
 
     if (!a->len)

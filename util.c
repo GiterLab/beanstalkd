@@ -1,10 +1,10 @@
 #include "dat.h"
-#include <stdint.h>
-#include <stdlib.h>
 #include <errno.h>
-#include <stdio.h>
-#include <string.h>
 #include <stdarg.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #ifdef HAVE_LIBSYSTEMD
 #include <systemd/sd-daemon.h>
@@ -12,24 +12,19 @@
 
 const char *progname;
 
-static void
-vwarnx(const char *err, const char *fmt, va_list args)
-__attribute__((format(printf, 2, 0)));
+static void vwarnx(const char *err, const char *fmt, va_list args) __attribute__((format(printf, 2, 0)));
 
-static void
-vwarnx(const char *err, const char *fmt, va_list args)
-{
+static void vwarnx(const char *err, const char *fmt, va_list args) {
     fprintf(stderr, "%s: ", progname);
     if (fmt) {
         vfprintf(stderr, fmt, args);
-        if (err) fprintf(stderr, ": %s", err);
+        if (err)
+            fprintf(stderr, ": %s", err);
     }
     fputc('\n', stderr);
 }
 
-void
-warn(const char *fmt, ...)
-{
+void warn(const char *fmt, ...) {
     char *err = strerror(errno); /* must be done first thing */
     va_list args;
 
@@ -38,19 +33,14 @@ warn(const char *fmt, ...)
     va_end(args);
 }
 
-void
-warnx(const char *fmt, ...)
-{
+void warnx(const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
     vwarnx(NULL, fmt, args);
     va_end(args);
 }
 
-
-char*
-fmtalloc(char *fmt, ...)
-{
+char *fmtalloc(char *fmt, ...) {
     int n;
     char *buf;
     va_list ap;
@@ -69,13 +59,10 @@ fmtalloc(char *fmt, ...)
     return buf;
 }
 
-
 // Zalloc allocates n bytes of zeroed memory and
 // returns a pointer to it.
 // If insufficient memory is available, zalloc returns 0.
-void*
-zalloc(int n)
-{
+void *zalloc(int n) {
     void *p;
 
     p = malloc(n);
@@ -85,10 +72,7 @@ zalloc(int n)
     return p;
 }
 
-
-static void
-warn_systemd_ignored_option(char *opt, char *arg)
-{
+static void warn_systemd_ignored_option(char *opt, char *arg) {
 #ifdef HAVE_LIBSYSTEMD
     if (sd_listen_fds(0) > 0) {
         warnx("inherited listen fd; ignoring option: %s %s", opt, arg);
@@ -96,12 +80,10 @@ warn_systemd_ignored_option(char *opt, char *arg)
 #endif
 }
 
-
-static void usage(int code) __attribute__ ((noreturn));
-static void
-usage(int code)
-{
-    fprintf(stderr, "Use: %s [OPTIONS]\n"
+static void usage(int code) __attribute__((noreturn));
+static void usage(int code) {
+    fprintf(stderr,
+            "Use: %s [OPTIONS]\n"
             "\n"
             "Options:\n"
             " -b DIR   write-ahead log directory\n"
@@ -119,25 +101,17 @@ usage(int code)
             " -v       show version information\n"
             " -V       increase verbosity\n"
             " -h       show this help\n",
-            progname,
-            DEFAULT_FSYNC_MS,
-            JOB_DATA_SIZE_LIMIT_DEFAULT,
-            JOB_DATA_SIZE_LIMIT_MAX,
-            Filesizedef);
+            progname, DEFAULT_FSYNC_MS, JOB_DATA_SIZE_LIMIT_DEFAULT, JOB_DATA_SIZE_LIMIT_MAX, Filesizedef);
     exit(code);
 }
 
-static char *flagusage(char *flag) __attribute__ ((noreturn));
-static char *
-flagusage(char *flag)
-{
+static char *flagusage(char *flag) __attribute__((noreturn));
+static char *flagusage(char *flag) {
     warnx("flag requires an argument: %s", flag);
     usage(5);
 }
 
-static size_t
-parse_size_t(char *str)
-{
+static size_t parse_size_t(char *str) {
     char r, x;
     size_t size;
 
@@ -149,87 +123,84 @@ parse_size_t(char *str)
     return size;
 }
 
-
-void
-optparse(Server *s, char **argv)
-{
+void optparse(Server *s, char **argv) {
     int64 ms;
     char *arg, *tmp;
-#   define EARGF(x) (*arg ? (tmp=arg,arg="",tmp) : *argv ? *argv++ : (x))
+#define EARGF(x) (*arg ? (tmp = arg, arg = "", tmp) : *argv ? *argv++ : (x))
 
     while ((arg = *argv++) && *arg++ == '-' && *arg) {
         char c;
         while ((c = *arg++)) {
             switch (c) {
-                case 'p':
-                    s->port = EARGF(flagusage("-p"));
-                    warn_systemd_ignored_option("-p", s->port);
-                    break;
-                case 'l':
-                    s->addr = EARGF(flagusage("-l"));
-                    warn_systemd_ignored_option("-l", s->addr);
-                    break;
-                case 'z':
-                    job_data_size_limit = parse_size_t(EARGF(flagusage("-z")));
-                    if (job_data_size_limit > JOB_DATA_SIZE_LIMIT_MAX) {
-                        warnx("maximum job size was set to %d", JOB_DATA_SIZE_LIMIT_MAX);
-                        job_data_size_limit = JOB_DATA_SIZE_LIMIT_MAX;
+            case 'p':
+                s->port = EARGF(flagusage("-p"));
+                warn_systemd_ignored_option("-p", s->port);
+                break;
+            case 'l':
+                s->addr = EARGF(flagusage("-l"));
+                warn_systemd_ignored_option("-l", s->addr);
+                break;
+            case 'z':
+                job_data_size_limit = parse_size_t(EARGF(flagusage("-z")));
+                if (job_data_size_limit > JOB_DATA_SIZE_LIMIT_MAX) {
+                    warnx("maximum job size was set to %d", JOB_DATA_SIZE_LIMIT_MAX);
+                    job_data_size_limit = JOB_DATA_SIZE_LIMIT_MAX;
+                }
+                break;
+            case 's':
+                s->wal.filesize = parse_size_t(EARGF(flagusage("-s")));
+                break;
+            case 'c':
+                warnx("-c flag was removed. binlog is always compacted.");
+                break;
+            case 'n':
+                warnx("-n flag was removed. binlog is always compacted.");
+                break;
+            case 'f':
+                ms = (int64)parse_size_t(EARGF(flagusage("-f")));
+                s->wal.syncrate = ms * 1000000;
+                s->wal.wantsync = 1;
+                break;
+            case 'F':
+                s->wal.wantsync = 0;
+                break;
+            case 'u':
+                s->user = EARGF(flagusage("-u"));
+                break;
+            case 'b':
+                s->wal.dir = EARGF(flagusage("-b"));
+                s->wal.use = 1;
+                break;
+            case 'P':
+                if (s->password) {
+                    warnx("password already set, ignoring -P option");
+                } else {
+                    s->password = EARGF(flagusage("-P"));
+                    if (strlen(s->password) > MAX_PASSWORD_LEN - 1) {
+                        warnx("password is too long, maximum length is %d", MAX_PASSWORD_LEN - 1);
+                        usage(5);
                     }
-                    break;
-                case 's':
-                    s->wal.filesize = parse_size_t(EARGF(flagusage("-s")));
-                    break;
-                case 'c':
-                    warnx("-c flag was removed. binlog is always compacted.");
-                    break;
-                case 'n':
-                    warnx("-n flag was removed. binlog is always compacted.");
-                    break;
-                case 'f':
-                    ms = (int64)parse_size_t(EARGF(flagusage("-f")));
-                    s->wal.syncrate = ms * 1000000;
-                    s->wal.wantsync = 1;
-                    break;
-                case 'F':
-                    s->wal.wantsync = 0;
-                    break;
-                case 'u':
-                    s->user = EARGF(flagusage("-u"));
-                    break;
-                case 'b':
-                    s->wal.dir = EARGF(flagusage("-b"));
-                    s->wal.use = 1;
-                    break;
-                case 'P':
-                    if (s->password) {
-                        warnx("password already set, ignoring -P option");
-                    } else {
-                        s->password = EARGF(flagusage("-P"));
-                        if (strlen(s->password) > MAX_PASSWORD_LEN - 1) {
-                            warnx("password is too long, maximum length is %d", MAX_PASSWORD_LEN-1);
-                            usage(5);
-                        }
-                        if (verbose >= 5) {
-                            printf("setting password to '%s'\n", s->password);
-                        }
+                    if (verbose >= 5) {
+                        printf("setting password to '%s'\n", s->password);
                     }
-                    break;
-                case 'h':
-                    usage(0);
-                case 'v':
-                    printf("beanstalkd %s\n", version);
-                    exit(0);
-                case 'V':
-                    verbose++;
-                    break;
-                default:
-                    warnx("unknown flag: %s", arg-2);
-                    usage(5);
+                }
+                break;
+            case 'h':
+                usage(0);
+            case 'v':
+                printf("beanstalkd %s\n", version);
+                exit(0);
+            case 'V':
+                verbose++;
+                break;
+            default:
+                warnx("unknown flag: %s", arg - 2);
+                usage(5);
             }
         }
     }
     if (arg) {
-        warnx("unknown argument: %s", arg-1);
+        warnx("unknown argument: %s", arg - 1);
         usage(5);
     }
 }

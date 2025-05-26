@@ -1,24 +1,17 @@
 #include "dat.h"
+#include <errno.h>
 #include <stdint.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <errno.h>
 #include <stdlib.h>
-#include <errno.h>
 #include <sys/event.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
 
-enum
-{
-    Infinity = 1 << 30
-};
+enum { Infinity = 1 << 30 };
 
-static int  kq;
+static int kq;
 
-
-int
-sockinit(void)
-{
+int sockinit(void) {
     kq = kqueue();
     if (kq == -1) {
         twarn("kqueue");
@@ -27,10 +20,7 @@ sockinit(void)
     return 0;
 }
 
-
-int
-sockwant(Socket *s, int rw)
-{
+int sockwant(Socket *s, int rw) {
     int n = 0;
     struct kevent evs[2] = {{0}};
     struct kevent *ev = evs;
@@ -69,10 +59,7 @@ sockwant(Socket *s, int rw)
     return kevent(kq, evs, n, NULL, 0, &ts);
 }
 
-
-int
-socknext(Socket **s, int64 timeout)
-{
+int socknext(Socket **s, int64 timeout) {
     int r;
     struct kevent ev;
     static struct timespec ts;

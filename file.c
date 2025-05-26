@@ -1,29 +1,25 @@
 #include "dat.h"
-#include <stdint.h>
-#include <inttypes.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <stdarg.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
-static int  readrec(File*, Job *, int*);
-static int  readrec5(File*, Job *, int*);
-static int  readfull(File*, void*, int, int*, char*);
-static void warnpos(File*, int, char*, ...)
-__attribute__((format(printf, 3, 4)));
+static int readrec(File *, Job *, int *);
+static int readrec5(File *, Job *, int *);
+static int readfull(File *, void *, int, int *, char *);
+static void warnpos(File *, int, char *, ...) __attribute__((format(printf, 3, 4)));
 
 FAlloc *falloc = &rawfalloc;
 
-enum
-{
-    Walver5 = 5
-};
+enum { Walver5 = 5 };
 
 typedef struct Jobrec5 Jobrec5;
 
@@ -31,31 +27,26 @@ struct Jobrec5 {
     uint64 id;
     uint32 pri;
     uint64 delay; // usec
-    uint64 ttr; // usec
-    int32  body_size;
-    uint64 created_at; // usec
+    uint64 ttr;   // usec
+    int32 body_size;
+    uint64 created_at;  // usec
     uint64 deadline_at; // usec
     uint32 reserve_ct;
     uint32 timeout_ct;
     uint32 release_ct;
     uint32 bury_ct;
     uint32 kick_ct;
-    byte   state;
+    byte state;
 
     char pad[1];
 };
 
-enum
-{
-	Jobrec5size = offsetof(Jobrec5, pad)
-};
+enum { Jobrec5size = offsetof(Jobrec5, pad) };
 
 // rawfalloc allocates disk space of len bytes.
 // It expects fd's offset to be 0; may also reset fd's offset to 0.
 // Returns 0 on success, and a positive errno otherwise.
-int
-rawfalloc(int fd, int len)
-{
+int rawfalloc(int fd, int len) {
     // We do not use ftruncate() because it might extend the file
     // with a sequence of null bytes or a hole.
     // posix_fallocate() is not portable enough, might fail for NFS.
@@ -67,36 +58,31 @@ rawfalloc(int fd, int len)
         if (w == -1)
             return errno;
     }
-    lseek(fd, 0, 0);            // do not care if this fails
+    lseek(fd, 0, 0); // do not care if this fails
     return 0;
 }
 
-void
-fileincref(File *f)
-{
-    if (!f) return;
+void fileincref(File *f) {
+    if (!f)
+        return;
     f->refs++;
 }
 
-
-void
-filedecref(File *f)
-{
-    if (!f) return;
+void filedecref(File *f) {
+    if (!f)
+        return;
     f->refs--;
     if (f->refs < 1) {
         walgc(f->w);
     }
 }
 
-
-void
-fileaddjob(File *f, Job *j)
-{
+void fileaddjob(File *f, Job *j) {
     Job *h;
 
     h = &f->jlist;
-    if (!h->fprev) h->fprev = h;
+    if (!h->fprev)
+        h->fprev = h;
     j->file = f;
     j->fprev = h->fprev;
     j->fnext = h;
@@ -105,12 +91,11 @@ fileaddjob(File *f, Job *j)
     fileincref(f);
 }
 
-
-void
-filermjob(File *f, Job *j)
-{
-    if (!f) return;
-    if (f != j->file) return;
+void filermjob(File *f, Job *j) {
+    if (!f)
+        return;
+    if (f != j->file)
+        return;
     j->fnext->fprev = j->fprev;
     j->fprev->fnext = j->fnext;
     j->fnext = 0;
@@ -121,12 +106,9 @@ filermjob(File *f, Job *j)
     filedecref(f);
 }
 
-
 // Fileread reads jobs from f->path into list.
 // It returns 0 on success, or 1 if any errors occurred.
-int
-fileread(File *f, Job *list)
-{
+int fileread(File *f, Job *list) {
     int err = 0, v;
 
     if (!readfull(f, &v, sizeof(v), &err, "version")) {
@@ -135,12 +117,14 @@ fileread(File *f, Job *list)
     switch (v) {
     case Walver:
         fileincref(f);
-        while (readrec(f, list, &err));
+        while (readrec(f, list, &err))
+            ;
         filedecref(f);
         return err;
     case Walver5:
         fileincref(f);
-        while (readrec5(f, list, &err));
+        while (readrec5(f, list, &err))
+            ;
         filedecref(f);
         return err;
     }
@@ -149,13 +133,10 @@ fileread(File *f, Job *list)
     return 1;
 }
 
-
 // Readrec reads a record from f->fd into linked list l.
 // If an error occurs, it sets *err to 1.
 // Readrec returns the number of records read, either 1 or 0.
-static int
-readrec(File *f, Job *l, int *err)
-{
+static int readrec(File *f, Job *l, int *err) {
     int r, sz = 0;
     int namelen;
     Jobrec jr;
@@ -202,7 +183,8 @@ readrec(File *f, Job *l, int *err)
     sz += r;
 
     // are we reading trailing zeroes?
-    if (!jr.id) return 0;
+    if (!jr.id)
+        return 0;
 
     j = job_find(jr.id);
     if (!(j || namelen)) {
@@ -224,15 +206,11 @@ readrec(File *f, Job *l, int *err)
     case Delayed:
         if (!j) {
             if ((size_t)jr.body_size > job_data_size_limit) {
-                warnpos(f, -r, "job %"PRIu64" is too big (%"PRId32" > %zu)",
-                        jr.id,
-                        jr.body_size,
-                        job_data_size_limit);
+                warnpos(f, -r, "job %" PRIu64 " is too big (%" PRId32 " > %zu)", jr.id, jr.body_size, job_data_size_limit);
                 goto Error;
             }
             t = tube_find_or_make(tubename);
-            j = make_job_with_id(jr.pri, jr.delay, jr.ttr, jr.body_size,
-                                 t, jr.id);
+            j = make_job_with_id(jr.pri, jr.delay, jr.ttr, jr.body_size, t, jr.id);
             job_list_reset(j);
             j->r.created_at = jr.created_at;
         }
@@ -242,7 +220,7 @@ readrec(File *f, Job *l, int *err)
         // full record; read the job body
         if (namelen) {
             if (jr.body_size != j->r.body_size) {
-                warnpos(f, -r, "job %"PRIu64" size changed", j->r.id);
+                warnpos(f, -r, "job %" PRIu64 " size changed", j->r.id);
                 warnpos(f, -r, "was %d, now %d", j->r.body_size, jr.body_size);
                 goto Error;
             }
@@ -281,12 +259,9 @@ Error:
     return 0;
 }
 
-
 // Readrec5 is like readrec, but it reads a record in "version 5"
 // of the log format.
-static int
-readrec5(File *f, Job *l, int *err)
-{
+static int readrec5(File *f, Job *l, int *err) {
     int r, sz = 0;
     size_t namelen;
     Jobrec5 jr;
@@ -327,7 +302,8 @@ readrec5(File *f, Job *l, int *err)
     sz += r;
 
     // are we reading trailing zeroes?
-    if (!jr.id) return 0;
+    if (!jr.id)
+        return 0;
 
     j = job_find(jr.id);
     if (!(j || namelen)) {
@@ -349,23 +325,19 @@ readrec5(File *f, Job *l, int *err)
     case Delayed:
         if (!j) {
             if ((size_t)jr.body_size > job_data_size_limit) {
-                warnpos(f, -r, "job %"PRIu64" is too big (%"PRId32" > %zu)",
-                        jr.id,
-                        jr.body_size,
-                        job_data_size_limit);
+                warnpos(f, -r, "job %" PRIu64 " is too big (%" PRId32 " > %zu)", jr.id, jr.body_size, job_data_size_limit);
                 goto Error;
             }
             t = tube_find_or_make(tubename);
-            j = make_job_with_id(jr.pri, jr.delay, jr.ttr, jr.body_size,
-                                 t, jr.id);
+            j = make_job_with_id(jr.pri, jr.delay, jr.ttr, jr.body_size, t, jr.id);
             job_list_reset(j);
         }
         j->r.id = jr.id;
         j->r.pri = jr.pri;
         j->r.delay = jr.delay * 1000; // us => ns
-        j->r.ttr = jr.ttr * 1000; // us => ns
+        j->r.ttr = jr.ttr * 1000;     // us => ns
         j->r.body_size = jr.body_size;
-        j->r.created_at = jr.created_at * 1000; // us => ns
+        j->r.created_at = jr.created_at * 1000;   // us => ns
         j->r.deadline_at = jr.deadline_at * 1000; // us => ns
         j->r.reserve_ct = jr.reserve_ct;
         j->r.timeout_ct = jr.timeout_ct;
@@ -378,8 +350,8 @@ readrec5(File *f, Job *l, int *err)
         // full record; read the job body
         if (namelen) {
             if (jr.body_size != j->r.body_size) {
-                warnpos(f, -r, "job %"PRIu64" size changed", j->r.id);
-                warnpos(f, -r, "was %"PRId32", now %"PRId32, j->r.body_size, jr.body_size);
+                warnpos(f, -r, "job %" PRIu64 " size changed", j->r.id);
+                warnpos(f, -r, "was %" PRId32 ", now %" PRId32, j->r.body_size, jr.body_size);
                 goto Error;
             }
             r = readfull(f, j->body, j->r.body_size, err, "v5 job body");
@@ -417,10 +389,7 @@ Error:
     return 0;
 }
 
-
-static int
-readfull(File *f, void *c, int n, int *err, char *desc)
-{
+static int readfull(File *f, void *c, int n, int *err, char *desc) {
     int r;
 
     r = read(f->fd, c, n);
@@ -438,32 +407,27 @@ readfull(File *f, void *c, int n, int *err, char *desc)
     return r;
 }
 
-static void
-warnpos(File *f, int adj, char *fmt, ...)
-{
+static void warnpos(File *f, int adj, char *fmt, ...) {
     int off;
     va_list ap;
 
     off = lseek(f->fd, 0, SEEK_CUR);
-    fprintf(stderr, "%s:%d: ", f->path, off+adj);
+    fprintf(stderr, "%s:%d: ", f->path, off + adj);
     va_start(ap, fmt);
     vfprintf(stderr, fmt, ap);
     va_end(ap);
     fputc('\n', stderr);
 }
 
-
 // Opens f for writing, writes a header, and initializes
 // f->free and f->resv.
 // Sets f->iswopen if successful.
-void
-filewopen(File *f)
-{
+void filewopen(File *f) {
     int fd, r;
     int n;
     int ver = Walver;
 
-    fd = open(f->path, O_WRONLY|O_CREAT, 0400);
+    fd = open(f->path, O_WRONLY | O_CREAT, 0400);
     if (fd < 0) {
         twarn("open %s", f->path);
         return;
@@ -497,10 +461,7 @@ filewopen(File *f)
     f->resv = 0;
 }
 
-
-static int
-filewrite(File *f, Job *j, void *buf, int len)
-{
+static int filewrite(File *f, Job *j, void *buf, int len) {
     int r;
 
     r = write(f->fd, buf, len);
@@ -517,16 +478,13 @@ filewrite(File *f, Job *j, void *buf, int len)
     return 1;
 }
 
-
-int
-filewrjobshort(File *f, Job *j)
-{
+int filewrjobshort(File *f, Job *j) {
     int r, nl;
 
     nl = 0; // name len 0 indicates short record
-    r = filewrite(f, j, &nl, sizeof nl) &&
-        filewrite(f, j, &j->r, sizeof j->r);
-    if (!r) return 0;
+    r = filewrite(f, j, &nl, sizeof nl) && filewrite(f, j, &j->r, sizeof j->r);
+    if (!r)
+        return 0;
 
     if (j->r.state == Invalid) {
         filermjob(j->file, j);
@@ -535,27 +493,19 @@ filewrjobshort(File *f, Job *j)
     return r;
 }
 
-
-int
-filewrjobfull(File *f, Job *j)
-{
+int filewrjobfull(File *f, Job *j) {
     int nl;
 
     fileaddjob(f, j);
     nl = strlen(j->tube->name);
-    return
-        filewrite(f, j, &nl, sizeof nl) &&
-        filewrite(f, j, j->tube->name, nl) &&
-        filewrite(f, j, &j->r, sizeof j->r) &&
-        filewrite(f, j, j->body, j->r.body_size);
+    return filewrite(f, j, &nl, sizeof nl) && filewrite(f, j, j->tube->name, nl) && filewrite(f, j, &j->r, sizeof j->r) && filewrite(f, j, j->body, j->r.body_size);
 }
 
-
-void
-filewclose(File *f)
-{
-    if (!f) return;
-    if (!f->iswopen) return;
+void filewclose(File *f) {
+    if (!f)
+        return;
+    if (!f->iswopen)
+        return;
     if (f->free) {
         errno = 0;
         if (ftruncate(f->fd, f->w->filesize - f->free) != 0) {
@@ -568,22 +518,16 @@ filewclose(File *f)
     filedecref(f);
 }
 
-
-int
-fileinit(File *f, Wal *w, int n)
-{
+int fileinit(File *f, Wal *w, int n) {
     f->w = w;
     f->seq = n;
     f->path = fmtalloc("%s/binlog.%d", w->dir, n);
     return !!f->path;
 }
 
-
 // Adds f to the linked list in w,
 // updating w->tail and w->head as necessary.
-Wal*
-fileadd(File *f, Wal *w)
-{
+Wal *fileadd(File *f, Wal *w) {
     if (w->tail) {
         w->tail->next = f;
     }

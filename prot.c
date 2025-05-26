@@ -1,239 +1,242 @@
 #include "dat.h"
+#include <errno.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <limits.h>
+#include <signal.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <stdio.h>
-#include <unistd.h>
-#include <fcntl.h>
+#include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 #include <sys/resource.h>
-#include <sys/uio.h>
-#include <sys/types.h>
-#include <sys/utsname.h>
 #include <sys/socket.h>
-#include <inttypes.h>
-#include <stdarg.h>
-#include <signal.h>
-#include <limits.h>
+#include <sys/types.h>
+#include <sys/uio.h>
+#include <sys/utsname.h>
+#include <unistd.h>
 
 /* job body cannot be greater than this many bytes long */
 size_t job_data_size_limit = JOB_DATA_SIZE_LIMIT_DEFAULT;
 
-#define NAME_CHARS \
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ" \
-    "abcdefghijklmnopqrstuvwxyz" \
+#define NAME_CHARS                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 \
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   \
+    "abcdefghijklmnopqrstuvwxyz"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   \
     "0123456789-+/;.$_()"
 
-#define PASSWORD_CHARS \
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ" \
-    "abcdefghijklmnopqrstuvwxyz" \
+#define PASSWORD_CHARS                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             \
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   \
+    "abcdefghijklmnopqrstuvwxyz"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   \
     "0123456789-+/;.$_()!@#%^&*()[]{}|\\:<>?,~`"
 
-#define CMD_PUT "put "
-#define CMD_PEEKJOB "peek "
-#define CMD_PEEK_READY "peek-ready"
-#define CMD_PEEK_DELAYED "peek-delayed"
-#define CMD_PEEK_BURIED "peek-buried"
-#define CMD_RESERVE "reserve"
-#define CMD_RESERVE_TIMEOUT "reserve-with-timeout "
-#define CMD_RESERVE_JOB "reserve-job "
-#define CMD_DELETE "delete "
-#define CMD_RELEASE "release "
-#define CMD_BURY "bury "
-#define CMD_KICK "kick "
-#define CMD_KICKJOB "kick-job "
-#define CMD_TOUCH "touch "
-#define CMD_STATS "stats"
-#define CMD_STATSJOB "stats-job "
-#define CMD_USE "use "
-#define CMD_WATCH "watch "
-#define CMD_IGNORE "ignore "
-#define CMD_LIST_TUBES "list-tubes"
-#define CMD_LIST_TUBE_USED "list-tube-used"
+#define CMD_PUT                "put "
+#define CMD_PEEKJOB            "peek "
+#define CMD_PEEK_READY         "peek-ready"
+#define CMD_PEEK_DELAYED       "peek-delayed"
+#define CMD_PEEK_BURIED        "peek-buried"
+#define CMD_RESERVE            "reserve"
+#define CMD_RESERVE_TIMEOUT    "reserve-with-timeout "
+#define CMD_RESERVE_JOB        "reserve-job "
+#define CMD_DELETE             "delete "
+#define CMD_RELEASE            "release "
+#define CMD_BURY               "bury "
+#define CMD_KICK               "kick "
+#define CMD_KICKJOB            "kick-job "
+#define CMD_TOUCH              "touch "
+#define CMD_STATS              "stats"
+#define CMD_STATSJOB           "stats-job "
+#define CMD_USE                "use "
+#define CMD_WATCH              "watch "
+#define CMD_IGNORE             "ignore "
+#define CMD_LIST_TUBES         "list-tubes"
+#define CMD_LIST_TUBE_USED     "list-tube-used"
 #define CMD_LIST_TUBES_WATCHED "list-tubes-watched"
-#define CMD_STATS_TUBE "stats-tube "
-#define CMD_QUIT "quit"
-#define CMD_PAUSE_TUBE "pause-tube"
-#define CMD_AUTH "auth "
+#define CMD_STATS_TUBE         "stats-tube "
+#define CMD_QUIT               "quit"
+#define CMD_PAUSE_TUBE         "pause-tube"
+#define CMD_AUTH               "auth "
 
 #define CONSTSTRLEN(m) (sizeof(m) - 1)
 
-#define CMD_PEEK_READY_LEN CONSTSTRLEN(CMD_PEEK_READY)
-#define CMD_PEEK_DELAYED_LEN CONSTSTRLEN(CMD_PEEK_DELAYED)
-#define CMD_PEEK_BURIED_LEN CONSTSTRLEN(CMD_PEEK_BURIED)
-#define CMD_PEEKJOB_LEN CONSTSTRLEN(CMD_PEEKJOB)
-#define CMD_RESERVE_LEN CONSTSTRLEN(CMD_RESERVE)
-#define CMD_RESERVE_TIMEOUT_LEN CONSTSTRLEN(CMD_RESERVE_TIMEOUT)
-#define CMD_RESERVE_JOB_LEN CONSTSTRLEN(CMD_RESERVE_JOB)
-#define CMD_DELETE_LEN CONSTSTRLEN(CMD_DELETE)
-#define CMD_RELEASE_LEN CONSTSTRLEN(CMD_RELEASE)
-#define CMD_BURY_LEN CONSTSTRLEN(CMD_BURY)
-#define CMD_KICK_LEN CONSTSTRLEN(CMD_KICK)
-#define CMD_KICKJOB_LEN CONSTSTRLEN(CMD_KICKJOB)
-#define CMD_TOUCH_LEN CONSTSTRLEN(CMD_TOUCH)
-#define CMD_STATS_LEN CONSTSTRLEN(CMD_STATS)
-#define CMD_STATSJOB_LEN CONSTSTRLEN(CMD_STATSJOB)
-#define CMD_USE_LEN CONSTSTRLEN(CMD_USE)
-#define CMD_WATCH_LEN CONSTSTRLEN(CMD_WATCH)
-#define CMD_IGNORE_LEN CONSTSTRLEN(CMD_IGNORE)
-#define CMD_LIST_TUBES_LEN CONSTSTRLEN(CMD_LIST_TUBES)
-#define CMD_LIST_TUBE_USED_LEN CONSTSTRLEN(CMD_LIST_TUBE_USED)
+#define CMD_PEEK_READY_LEN         CONSTSTRLEN(CMD_PEEK_READY)
+#define CMD_PEEK_DELAYED_LEN       CONSTSTRLEN(CMD_PEEK_DELAYED)
+#define CMD_PEEK_BURIED_LEN        CONSTSTRLEN(CMD_PEEK_BURIED)
+#define CMD_PEEKJOB_LEN            CONSTSTRLEN(CMD_PEEKJOB)
+#define CMD_RESERVE_LEN            CONSTSTRLEN(CMD_RESERVE)
+#define CMD_RESERVE_TIMEOUT_LEN    CONSTSTRLEN(CMD_RESERVE_TIMEOUT)
+#define CMD_RESERVE_JOB_LEN        CONSTSTRLEN(CMD_RESERVE_JOB)
+#define CMD_DELETE_LEN             CONSTSTRLEN(CMD_DELETE)
+#define CMD_RELEASE_LEN            CONSTSTRLEN(CMD_RELEASE)
+#define CMD_BURY_LEN               CONSTSTRLEN(CMD_BURY)
+#define CMD_KICK_LEN               CONSTSTRLEN(CMD_KICK)
+#define CMD_KICKJOB_LEN            CONSTSTRLEN(CMD_KICKJOB)
+#define CMD_TOUCH_LEN              CONSTSTRLEN(CMD_TOUCH)
+#define CMD_STATS_LEN              CONSTSTRLEN(CMD_STATS)
+#define CMD_STATSJOB_LEN           CONSTSTRLEN(CMD_STATSJOB)
+#define CMD_USE_LEN                CONSTSTRLEN(CMD_USE)
+#define CMD_WATCH_LEN              CONSTSTRLEN(CMD_WATCH)
+#define CMD_IGNORE_LEN             CONSTSTRLEN(CMD_IGNORE)
+#define CMD_LIST_TUBES_LEN         CONSTSTRLEN(CMD_LIST_TUBES)
+#define CMD_LIST_TUBE_USED_LEN     CONSTSTRLEN(CMD_LIST_TUBE_USED)
 #define CMD_LIST_TUBES_WATCHED_LEN CONSTSTRLEN(CMD_LIST_TUBES_WATCHED)
-#define CMD_STATS_TUBE_LEN CONSTSTRLEN(CMD_STATS_TUBE)
-#define CMD_PAUSE_TUBE_LEN CONSTSTRLEN(CMD_PAUSE_TUBE)
-#define CMD_AUTH_LEN CONSTSTRLEN(CMD_AUTH)
+#define CMD_STATS_TUBE_LEN         CONSTSTRLEN(CMD_STATS_TUBE)
+#define CMD_PAUSE_TUBE_LEN         CONSTSTRLEN(CMD_PAUSE_TUBE)
+#define CMD_AUTH_LEN               CONSTSTRLEN(CMD_AUTH)
 
-#define MSG_FOUND "FOUND"
-#define MSG_NOTFOUND "NOT_FOUND\r\n"
-#define MSG_RESERVED "RESERVED"
+#define MSG_FOUND         "FOUND"
+#define MSG_NOTFOUND      "NOT_FOUND\r\n"
+#define MSG_RESERVED      "RESERVED"
 #define MSG_DEADLINE_SOON "DEADLINE_SOON\r\n"
-#define MSG_TIMED_OUT "TIMED_OUT\r\n"
-#define MSG_DELETED "DELETED\r\n"
-#define MSG_RELEASED "RELEASED\r\n"
-#define MSG_BURIED "BURIED\r\n"
-#define MSG_KICKED "KICKED\r\n"
-#define MSG_TOUCHED "TOUCHED\r\n"
-#define MSG_BURIED_FMT "BURIED %"PRIu64"\r\n"
-#define MSG_INSERTED_FMT "INSERTED %"PRIu64"\r\n"
-#define MSG_NOT_IGNORED "NOT_IGNORED\r\n"
+#define MSG_TIMED_OUT     "TIMED_OUT\r\n"
+#define MSG_DELETED       "DELETED\r\n"
+#define MSG_RELEASED      "RELEASED\r\n"
+#define MSG_BURIED        "BURIED\r\n"
+#define MSG_KICKED        "KICKED\r\n"
+#define MSG_TOUCHED       "TOUCHED\r\n"
+#define MSG_BURIED_FMT    "BURIED %" PRIu64 "\r\n"
+#define MSG_INSERTED_FMT  "INSERTED %" PRIu64 "\r\n"
+#define MSG_NOT_IGNORED   "NOT_IGNORED\r\n"
 
-#define MSG_OUT_OF_MEMORY "OUT_OF_MEMORY\r\n"
-#define MSG_INTERNAL_ERROR "INTERNAL_ERROR\r\n"
-#define MSG_DRAINING "DRAINING\r\n"
-#define MSG_BAD_FORMAT "BAD_FORMAT\r\n"
+#define MSG_OUT_OF_MEMORY   "OUT_OF_MEMORY\r\n"
+#define MSG_INTERNAL_ERROR  "INTERNAL_ERROR\r\n"
+#define MSG_DRAINING        "DRAINING\r\n"
+#define MSG_BAD_FORMAT      "BAD_FORMAT\r\n"
 #define MSG_UNKNOWN_COMMAND "UNKNOWN_COMMAND\r\n"
-#define MSG_EXPECTED_CRLF "EXPECTED_CRLF\r\n"
-#define MSG_JOB_TOO_BIG "JOB_TOO_BIG\r\n"
+#define MSG_EXPECTED_CRLF   "EXPECTED_CRLF\r\n"
+#define MSG_JOB_TOO_BIG     "JOB_TOO_BIG\r\n"
 
-#define MSG_AUTHORIZED "AUTHORIZED\r\n"
+#define MSG_AUTHORIZED   "AUTHORIZED\r\n"
 #define MSG_UNAUTHORIZED "NOT_AUTHORIZED\r\n"
 
 // Connection can be in one of these states:
-#define STATE_WANT_COMMAND  0  // conn expects a command from the client
-#define STATE_WANT_DATA     1  // conn expects a job data
-#define STATE_SEND_JOB      2  // conn sends job to the client
-#define STATE_SEND_WORD     3  // conn sends a line reply
-#define STATE_WAIT          4  // client awaits for the job reservation
-#define STATE_BITBUCKET     5  // conn discards content
-#define STATE_CLOSE         6  // conn should be closed
-#define STATE_WANT_ENDLINE  7  // skip until the end of a line
+#define STATE_WANT_COMMAND 0 // conn expects a command from the client
+#define STATE_WANT_DATA    1 // conn expects a job data
+#define STATE_SEND_JOB     2 // conn sends job to the client
+#define STATE_SEND_WORD    3 // conn sends a line reply
+#define STATE_WAIT         4 // client awaits for the job reservation
+#define STATE_BITBUCKET    5 // conn discards content
+#define STATE_CLOSE        6 // conn should be closed
+#define STATE_WANT_ENDLINE 7 // skip until the end of a line
 
-#define OP_UNKNOWN 0
-#define OP_PUT 1
-#define OP_PEEKJOB 2
-#define OP_RESERVE 3
-#define OP_DELETE 4
-#define OP_RELEASE 5
-#define OP_BURY 6
-#define OP_KICK 7
-#define OP_STATS 8
-#define OP_STATSJOB 9
-#define OP_PEEK_BURIED 10
-#define OP_USE 11
-#define OP_WATCH 12
-#define OP_IGNORE 13
-#define OP_LIST_TUBES 14
-#define OP_LIST_TUBE_USED 15
+#define OP_UNKNOWN            0
+#define OP_PUT                1
+#define OP_PEEKJOB            2
+#define OP_RESERVE            3
+#define OP_DELETE             4
+#define OP_RELEASE            5
+#define OP_BURY               6
+#define OP_KICK               7
+#define OP_STATS              8
+#define OP_STATSJOB           9
+#define OP_PEEK_BURIED        10
+#define OP_USE                11
+#define OP_WATCH              12
+#define OP_IGNORE             13
+#define OP_LIST_TUBES         14
+#define OP_LIST_TUBE_USED     15
 #define OP_LIST_TUBES_WATCHED 16
-#define OP_STATS_TUBE 17
-#define OP_PEEK_READY 18
-#define OP_PEEK_DELAYED 19
-#define OP_RESERVE_TIMEOUT 20
-#define OP_TOUCH 21
-#define OP_QUIT 22
-#define OP_PAUSE_TUBE 23
-#define OP_KICKJOB 24
-#define OP_RESERVE_JOB 25
-#define OP_AUTH 26
-#define TOTAL_OPS 27
+#define OP_STATS_TUBE         17
+#define OP_PEEK_READY         18
+#define OP_PEEK_DELAYED       19
+#define OP_RESERVE_TIMEOUT    20
+#define OP_TOUCH              21
+#define OP_QUIT               22
+#define OP_PAUSE_TUBE         23
+#define OP_KICKJOB            24
+#define OP_RESERVE_JOB        25
+#define OP_AUTH               26
+#define TOTAL_OPS             27
 
-#define STATS_FMT "---\n" \
-    "current-jobs-urgent: %" PRIu64 "\n" \
-    "current-jobs-ready: %" PRIu64 "\n" \
-    "current-jobs-reserved: %" PRIu64 "\n" \
-    "current-jobs-delayed: %u\n" \
-    "current-jobs-buried: %" PRIu64 "\n" \
-    "cmd-put: %" PRIu64 "\n" \
-    "cmd-peek: %" PRIu64 "\n" \
-    "cmd-peek-ready: %" PRIu64 "\n" \
-    "cmd-peek-delayed: %" PRIu64 "\n" \
-    "cmd-peek-buried: %" PRIu64 "\n" \
-    "cmd-reserve: %" PRIu64 "\n" \
-    "cmd-reserve-with-timeout: %" PRIu64 "\n" \
-    "cmd-delete: %" PRIu64 "\n" \
-    "cmd-release: %" PRIu64 "\n" \
-    "cmd-use: %" PRIu64 "\n" \
-    "cmd-watch: %" PRIu64 "\n" \
-    "cmd-ignore: %" PRIu64 "\n" \
-    "cmd-bury: %" PRIu64 "\n" \
-    "cmd-kick: %" PRIu64 "\n" \
-    "cmd-touch: %" PRIu64 "\n" \
-    "cmd-stats: %" PRIu64 "\n" \
-    "cmd-stats-job: %" PRIu64 "\n" \
-    "cmd-stats-tube: %" PRIu64 "\n" \
-    "cmd-list-tubes: %" PRIu64 "\n" \
-    "cmd-list-tube-used: %" PRIu64 "\n" \
-    "cmd-list-tubes-watched: %" PRIu64 "\n" \
-    "cmd-pause-tube: %" PRIu64 "\n" \
-    "job-timeouts: %" PRIu64 "\n" \
-    "total-jobs: %" PRIu64 "\n" \
-    "max-job-size: %zu\n" \
-    "current-tubes: %zu\n" \
-    "current-connections: %u\n" \
-    "current-producers: %u\n" \
-    "current-workers: %u\n" \
-    "current-waiting: %" PRIu64 "\n" \
-    "total-connections: %u\n" \
-    "pid: %ld\n" \
-    "version: \"%s\"\n" \
-    "rusage-utime: %d.%06d\n" \
-    "rusage-stime: %d.%06d\n" \
-    "uptime: %u\n" \
-    "binlog-oldest-index: %d\n" \
-    "binlog-current-index: %d\n" \
-    "binlog-records-migrated: %" PRId64 "\n" \
-    "binlog-records-written: %" PRId64 "\n" \
-    "binlog-max-size: %d\n" \
-    "draining: %s\n" \
-    "id: %s\n" \
-    "hostname: \"%s\"\n" \
-    "os: \"%s\"\n" \
-    "platform: \"%s\"\n" \
+#define STATS_FMT                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  \
+    "---\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        \
+    "current-jobs-urgent: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                           \
+    "current-jobs-ready: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                            \
+    "current-jobs-reserved: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                         \
+    "current-jobs-delayed: %u\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   \
+    "current-jobs-buried: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                           \
+    "cmd-put: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       \
+    "cmd-peek: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      \
+    "cmd-peek-ready: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                \
+    "cmd-peek-delayed: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                              \
+    "cmd-peek-buried: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                               \
+    "cmd-reserve: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   \
+    "cmd-reserve-with-timeout: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                      \
+    "cmd-delete: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    \
+    "cmd-release: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   \
+    "cmd-use: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       \
+    "cmd-watch: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     \
+    "cmd-ignore: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    \
+    "cmd-bury: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      \
+    "cmd-kick: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      \
+    "cmd-touch: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     \
+    "cmd-stats: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     \
+    "cmd-stats-job: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 \
+    "cmd-stats-tube: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                \
+    "cmd-list-tubes: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                \
+    "cmd-list-tube-used: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                            \
+    "cmd-list-tubes-watched: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                        \
+    "cmd-pause-tube: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                \
+    "job-timeouts: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  \
+    "total-jobs: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    \
+    "max-job-size: %zu\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          \
+    "current-tubes: %zu\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         \
+    "current-connections: %u\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    \
+    "current-producers: %u\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      \
+    "current-workers: %u\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        \
+    "current-waiting: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                               \
+    "total-connections: %u\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      \
+    "pid: %ld\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   \
+    "version: \"%s\"\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            \
+    "rusage-utime: %d.%06d\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      \
+    "rusage-stime: %d.%06d\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      \
+    "uptime: %u\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 \
+    "binlog-oldest-index: %d\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    \
+    "binlog-current-index: %d\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   \
+    "binlog-records-migrated: %" PRId64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                       \
+    "binlog-records-written: %" PRId64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                        \
+    "binlog-max-size: %d\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        \
+    "draining: %s\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               \
+    "id: %s\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     \
+    "hostname: \"%s\"\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           \
+    "os: \"%s\"\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 \
+    "platform: \"%s\"\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           \
     "\r\n"
 
-#define STATS_TUBE_FMT "---\n" \
-    "name: \"%s\"\n" \
-    "current-jobs-urgent: %" PRIu64 "\n" \
-    "current-jobs-ready: %zu\n" \
-    "current-jobs-reserved: %" PRIu64 "\n" \
-    "current-jobs-delayed: %zu\n" \
-    "current-jobs-buried: %" PRIu64 "\n" \
-    "total-jobs: %" PRIu64 "\n" \
-    "current-using: %u\n" \
-    "current-watching: %u\n" \
-    "current-waiting: %" PRIu64 "\n" \
-    "cmd-delete: %" PRIu64 "\n" \
-    "cmd-pause-tube: %" PRIu64 "\n" \
-    "pause: %" PRIu64 "\n" \
-    "pause-time-left: %" PRId64 "\n" \
+#define STATS_TUBE_FMT                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             \
+    "---\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        \
+    "name: \"%s\"\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               \
+    "current-jobs-urgent: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                           \
+    "current-jobs-ready: %zu\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    \
+    "current-jobs-reserved: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                         \
+    "current-jobs-delayed: %zu\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  \
+    "current-jobs-buried: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                           \
+    "total-jobs: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    \
+    "current-using: %u\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          \
+    "current-watching: %u\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       \
+    "current-waiting: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                               \
+    "cmd-delete: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    \
+    "cmd-pause-tube: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                \
+    "pause: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         \
+    "pause-time-left: %" PRId64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                               \
     "\r\n"
 
-#define STATS_JOB_FMT "---\n" \
-    "id: %" PRIu64 "\n" \
-    "tube: \"%s\"\n" \
-    "state: %s\n" \
-    "pri: %u\n" \
-    "age: %" PRId64 "\n" \
-    "delay: %" PRId64 "\n" \
-    "ttr: %" PRId64 "\n" \
-    "time-left: %" PRId64 "\n" \
-    "file: %d\n" \
-    "reserves: %u\n" \
-    "timeouts: %u\n" \
-    "releases: %u\n" \
-    "buries: %u\n" \
-    "kicks: %u\n" \
+#define STATS_JOB_FMT                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              \
+    "---\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        \
+    "id: %" PRIu64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            \
+    "tube: \"%s\"\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               \
+    "state: %s\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  \
+    "pri: %u\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    \
+    "age: %" PRId64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           \
+    "delay: %" PRId64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         \
+    "ttr: %" PRId64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           \
+    "time-left: %" PRId64 "\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     \
+    "file: %d\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   \
+    "reserves: %u\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               \
+    "timeouts: %u\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               \
+    "releases: %u\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               \
+    "buries: %u\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 \
+    "kicks: %u\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  \
     "\r\n"
 
 // The size of the throw-away (BITBUCKET) buffer. Arbitrary.
@@ -261,33 +264,8 @@ static struct utsname node_info;
 // in the event notification mechanism.
 static Conn *epollq;
 
-static const char * op_names[] = {
-    "<unknown>",
-    CMD_PUT,
-    CMD_PEEKJOB,
-    CMD_RESERVE,
-    CMD_DELETE,
-    CMD_RELEASE,
-    CMD_BURY,
-    CMD_KICK,
-    CMD_STATS,
-    CMD_STATSJOB,
-    CMD_PEEK_BURIED,
-    CMD_USE,
-    CMD_WATCH,
-    CMD_IGNORE,
-    CMD_LIST_TUBES,
-    CMD_LIST_TUBE_USED,
-    CMD_LIST_TUBES_WATCHED,
-    CMD_STATS_TUBE,
-    CMD_PEEK_READY,
-    CMD_PEEK_DELAYED,
-    CMD_RESERVE_TIMEOUT,
-    CMD_TOUCH,
-    CMD_QUIT,
-    CMD_PAUSE_TUBE,
-    CMD_KICKJOB,
-    CMD_RESERVE_JOB,
+static const char *op_names[] = {
+    "<unknown>", CMD_PUT, CMD_PEEKJOB, CMD_RESERVE, CMD_DELETE, CMD_RELEASE, CMD_BURY, CMD_KICK, CMD_STATS, CMD_STATSJOB, CMD_PEEK_BURIED, CMD_USE, CMD_WATCH, CMD_IGNORE, CMD_LIST_TUBES, CMD_LIST_TUBE_USED, CMD_LIST_TUBES_WATCHED, CMD_STATS_TUBE, CMD_PEEK_READY, CMD_PEEK_DELAYED, CMD_RESERVE_TIMEOUT, CMD_TOUCH, CMD_QUIT, CMD_PAUSE_TUBE, CMD_KICKJOB, CMD_RESERVE_JOB,
 };
 
 static Job *remove_ready_job(Job *j);
@@ -296,8 +274,7 @@ static Job *remove_buried_job(Job *j);
 // epollq_add schedules connection c in the s->conns heap, adds c
 // to the epollq list to change expected operation in event notifications.
 // rw='w' means to notify when socket is writeable, 'r' - readable, 'h' - closed.
-static void
-epollq_add(Conn *c, char rw) {
+static void epollq_add(Conn *c, char rw) {
     c->rw = rw;
     connsched(c);
     c->next = epollq;
@@ -305,9 +282,7 @@ epollq_add(Conn *c, char rw) {
 }
 
 // epollq_rmconn removes connection c from the epollq.
-static void
-epollq_rmconn(Conn *c)
-{
+static void epollq_rmconn(Conn *c) {
     Conn *x, *newhead = NULL;
 
     while (epollq) {
@@ -327,9 +302,7 @@ epollq_rmconn(Conn *c)
 
 // Propagate changes to event notification mechanism about expected operations
 // in connections' sockets. Clear the epollq list.
-static void
-epollq_apply()
-{
+static void epollq_apply() {
     Conn *c;
 
     while (epollq) {
@@ -344,15 +317,11 @@ epollq_apply()
     }
 }
 
-#define reply_msg(c, m) \
-    reply((c), (m), CONSTSTRLEN(m), STATE_SEND_WORD)
+#define reply_msg(c, m) reply((c), (m), CONSTSTRLEN(m), STATE_SEND_WORD)
 
-#define reply_serr(c, e) \
-    (twarnx("server error: %s", (e)), reply_msg((c), (e)))
+#define reply_serr(c, e) (twarnx("server error: %s", (e)), reply_msg((c), (e)))
 
-static void
-reply(Conn *c, char *line, int len, int state)
-{
+static void reply(Conn *c, char *line, int len, int state) {
     if (!c)
         return;
 
@@ -363,19 +332,15 @@ reply(Conn *c, char *line, int len, int state)
     c->reply_sent = 0;
     c->state = state;
     if (verbose >= 2) {
-        printf(">%d reply %.*s\n", c->sock.fd, len-2, line);
+        printf(">%d reply %.*s\n", c->sock.fd, len - 2, line);
     }
 }
 
-static void
-reply_line(Conn*, int, const char*, ...)
-__attribute__((format(printf, 3, 4)));
+static void reply_line(Conn *, int, const char *, ...) __attribute__((format(printf, 3, 4)));
 
 // reply_line prints *fmt into c->reply_buffer and
 // calls reply() for the string and state.
-static void
-reply_line(Conn *c, int state, const char *fmt, ...)
-{
+static void reply_line(Conn *c, int state, const char *fmt, ...) {
     int r;
     va_list ap;
 
@@ -394,21 +359,16 @@ reply_line(Conn *c, int state, const char *fmt, ...)
 
 // reply_job tells the connection c which job to send,
 // and replies with this line: <msg> <job_id> <job_size>.
-static void
-reply_job(Conn *c, Job *j, const char *msg)
-{
+static void reply_job(Conn *c, Job *j, const char *msg) {
     c->out_job = j;
     c->out_job_sent = 0;
-    reply_line(c, STATE_SEND_JOB, "%s %"PRIu64" %u\r\n",
-               msg, j->r.id, j->r.body_size - 2);
+    reply_line(c, STATE_SEND_JOB, "%s %" PRIu64 " %u\r\n", msg, j->r.id, j->r.body_size - 2);
 }
 
 // remove_waiting_conn unsets CONN_TYPE_WAITING for the connection,
 // removes it from the waiting_conns set of every tube it's watching.
 // Noop if connection is not waiting.
-void
-remove_waiting_conn(Conn *c)
-{
+void remove_waiting_conn(Conn *c) {
     if (!conn_waiting(c))
         return;
 
@@ -424,9 +384,7 @@ remove_waiting_conn(Conn *c)
 
 // enqueue_waiting_conn sets CONN_TYPE_WAITING for the connection,
 // adds it to the waiting_conns set of every tube it's watching.
-static void
-enqueue_waiting_conn(Conn *c)
-{
+static void enqueue_waiting_conn(Conn *c) {
     c->type |= CONN_TYPE_WAITING;
     global_stat.waiting_ct++;
     size_t i;
@@ -441,9 +399,7 @@ enqueue_waiting_conn(Conn *c)
 // returns the next ready job with the smallest priority.
 // If jobs has the same priority it picks the job with smaller id.
 // All tubes with expired pause are unpaused.
-static Job *
-next_awaited_job(int64 now)
-{
+static Job *next_awaited_job(int64 now) {
     size_t i;
     Job *j = NULL;
 
@@ -465,9 +421,7 @@ next_awaited_job(int64 now)
 }
 
 // process_queue performs reservation for every jobs that is awaited for.
-static void
-process_queue()
-{
+static void process_queue() {
     Job *j = NULL;
     int64 now = nanoseconds();
 
@@ -492,9 +446,7 @@ process_queue()
 
 // soonest_delayed_job returns the delayed job
 // with the smallest deadline_at among all tubes.
-static Job *
-soonest_delayed_job()
-{
+static Job *soonest_delayed_job() {
     Job *j = NULL;
     size_t i;
 
@@ -514,9 +466,7 @@ soonest_delayed_job()
 // If update_store then it writes an entry to WAL.
 // On success it processes the queue.
 // BUG: If maintenance of WAL has failed, it is not reported as error.
-static int
-enqueue_job(Server *s, Job *j, int64 delay, char update_store)
-{
+static int enqueue_job(Server *s, Job *j, int64 delay, char update_store) {
     int r;
 
     j->reserver = NULL;
@@ -551,9 +501,7 @@ enqueue_job(Server *s, Job *j, int64 delay, char update_store)
     return 1;
 }
 
-static int
-bury_job(Server *s, Job *j, char update_store)
-{
+static int bury_job(Server *s, Job *j, char update_store) {
     if (update_store) {
         int z = walresvupdate(&s->wal);
         if (!z)
@@ -578,9 +526,7 @@ bury_job(Server *s, Job *j, char update_store)
     return 1;
 }
 
-void
-enqueue_reserved_jobs(Conn *c)
-{
+void enqueue_reserved_jobs(Conn *c) {
     while (!job_list_is_empty(&c->reserved_jobs)) {
         Job *j = job_list_remove(c->reserved_jobs.next);
         int r = enqueue_job(c->srv, j, 0, 0);
@@ -592,9 +538,7 @@ enqueue_reserved_jobs(Conn *c)
     }
 }
 
-static int
-kick_buried_job(Server *s, Job *j)
-{
+static int kick_buried_job(Server *s, Job *j) {
     int r;
     int z;
 
@@ -615,9 +559,7 @@ kick_buried_job(Server *s, Job *j)
     return 0;
 }
 
-static uint
-get_delayed_job_ct()
-{
+static uint get_delayed_job_ct() {
     size_t i;
     uint count = 0;
 
@@ -628,9 +570,7 @@ get_delayed_job_ct()
     return count;
 }
 
-static int
-kick_delayed_job(Server *s, Job *j)
-{
+static int kick_delayed_job(Server *s, Job *j) {
     int r;
     int z;
 
@@ -656,17 +596,13 @@ kick_delayed_job(Server *s, Job *j)
     return 0;
 }
 
-static int
-buried_job_p(Tube *t)
-{
+static int buried_job_p(Tube *t) {
     // this function does not do much. inline?
     return !job_list_is_empty(&t->buried);
 }
 
 /* return the number of jobs successfully kicked */
-static uint
-kick_buried_jobs(Server *s, Tube *t, uint n)
-{
+static uint kick_buried_jobs(Server *s, Tube *t, uint n) {
     uint i;
     for (i = 0; (i < n) && buried_job_p(t); ++i) {
         kick_buried_job(s, t->buried.next);
@@ -675,9 +611,7 @@ kick_buried_jobs(Server *s, Tube *t, uint n)
 }
 
 /* return the number of jobs successfully kicked */
-static uint
-kick_delayed_jobs(Server *s, Tube *t, uint n)
-{
+static uint kick_delayed_jobs(Server *s, Tube *t, uint n) {
     uint i;
     for (i = 0; (i < n) && (t->delay.len > 0); ++i) {
         kick_delayed_job(s, (Job *)t->delay.data[0]);
@@ -685,9 +619,7 @@ kick_delayed_jobs(Server *s, Tube *t, uint n)
     return i;
 }
 
-static uint
-kick_jobs(Server *s, Tube *t, uint n)
-{
+static uint kick_jobs(Server *s, Tube *t, uint n) {
     if (buried_job_p(t))
         return kick_buried_jobs(s, t, n);
     return kick_delayed_jobs(s, t, n);
@@ -695,9 +627,7 @@ kick_jobs(Server *s, Tube *t, uint n)
 
 // remove_buried_job returns non-NULL value if job j was in the buried state.
 // It excludes the job from the buried list and updates counters.
-static Job *
-remove_buried_job(Job *j)
-{
+static Job *remove_buried_job(Job *j) {
     if (!j || j->r.state != Buried)
         return NULL;
     j = job_list_remove(j);
@@ -710,9 +640,7 @@ remove_buried_job(Job *j)
 
 // remove_delayed_job returns non-NULL value if job j was in the delayed state.
 // It removes the job from the tube delayed heap.
-static Job *
-remove_delayed_job(Job *j)
-{
+static Job *remove_delayed_job(Job *j) {
     if (!j || j->r.state != Delayed)
         return NULL;
     heapremove(&j->tube->delay, j->heap_index);
@@ -722,9 +650,7 @@ remove_delayed_job(Job *j)
 
 // remove_ready_job returns non-NULL value if job j was in the ready state.
 // It removes the job from the tube ready heap and updates counters.
-static Job *
-remove_ready_job(Job *j)
-{
+static Job *remove_ready_job(Job *j) {
     if (!j || j->r.state != Ready)
         return NULL;
     heapremove(&j->tube->ready, j->heap_index);
@@ -736,15 +662,11 @@ remove_ready_job(Job *j)
     return j;
 }
 
-static bool
-is_job_reserved_by_conn(Conn *c, Job *j)
-{
+static bool is_job_reserved_by_conn(Conn *c, Job *j) {
     return j && j->reserver == c && j->r.state == Reserved;
 }
 
-static bool
-touch_job(Conn *c, Job *j)
-{
+static bool touch_job(Conn *c, Job *j) {
     if (is_job_reserved_by_conn(c, j)) {
         j->r.deadline_at = nanoseconds() + j->r.ttr;
         c->soonest_job = NULL;
@@ -753,9 +675,7 @@ touch_job(Conn *c, Job *j)
     return false;
 }
 
-static void
-check_err(Conn *c, const char *s)
-{
+static void check_err(Conn *c, const char *s) {
     if (errno == EAGAIN)
         return;
     if (errno == EINTR)
@@ -769,9 +689,7 @@ check_err(Conn *c, const char *s)
 
 /* Scan the given string for the sequence "\r\n" and return the line length.
  * Always returns at least 2 if a match is found. Returns 0 if no match. */
-static size_t
-scan_line_end(const char *s, int size)
-{
+static size_t scan_line_end(const char *s, int size) {
     char *match;
 
     match = memchr(s, '\r', size - 1);
@@ -786,10 +704,10 @@ scan_line_end(const char *s, int size)
 }
 
 /* parse the command line */
-static int
-which_cmd(Conn *c)
-{
-#define TEST_CMD(s,c,o) if (strncmp((s), (c), CONSTSTRLEN(c)) == 0) return (o);
+static int which_cmd(Conn *c) {
+#define TEST_CMD(s, c, o)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          \
+    if (strncmp((s), (c), CONSTSTRLEN(c)) == 0)                                                                                                                                                                                                                                                                                                                                                                                                                                                                    \
+        return (o);
     TEST_CMD(c->cmd, CMD_PUT, OP_PUT);
     TEST_CMD(c->cmd, CMD_PEEKJOB, OP_PEEKJOB);
     TEST_CMD(c->cmd, CMD_PEEK_READY, OP_PEEK_READY);
@@ -822,9 +740,7 @@ which_cmd(Conn *c)
 /* Copy up to body_size trailing bytes into the job, then the rest into the cmd
  * buffer. If c->in_job exists, this assumes that c->in_job->body is empty.
  * This function is idempotent(). */
-static void
-fill_extra_data(Conn *c)
-{
+static void fill_extra_data(Conn *c) {
     if (!c->sock.fd)
         return; /* the connection was closed */
     if (!c->cmd_len)
@@ -852,11 +768,9 @@ fill_extra_data(Conn *c)
     c->cmd_len = 0; /* we no longer know the length of the new command */
 }
 
-#define skip(conn,n,msg) (_skip(conn, n, msg, CONSTSTRLEN(msg)))
+#define skip(conn, n, msg) (_skip(conn, n, msg, CONSTSTRLEN(msg)))
 
-static void
-_skip(Conn *c, int64 n, char *msg, int msglen)
-{
+static void _skip(Conn *c, int64 n, char *msg, int msglen) {
     /* Invert the meaning of in_job_read while throwing away data -- it
      * counts the bytes that remain to be thrown away. */
     c->in_job = 0;
@@ -874,9 +788,7 @@ _skip(Conn *c, int64 n, char *msg, int msglen)
     c->state = STATE_BITBUCKET;
 }
 
-static void
-enqueue_incoming_job(Conn *c)
-{
+static void enqueue_incoming_job(Conn *c) {
     int r;
     Job *j = c->in_job;
 
@@ -891,7 +803,7 @@ enqueue_incoming_job(Conn *c)
     }
 
     if (verbose >= 2) {
-        printf("<%d job %"PRIu64"\n", c->sock.fd, j->r.id);
+        printf("<%d job %" PRIu64 "\n", c->sock.fd, j->r.id);
     }
 
     if (drain_mode) {
@@ -932,15 +844,11 @@ enqueue_incoming_job(Conn *c)
     reply_line(c, STATE_SEND_WORD, MSG_BURIED_FMT, j->r.id);
 }
 
-static uint
-uptime()
-{
+static uint uptime() {
     return (nanoseconds() - started_at) / 1000000000;
 }
 
-static int
-fmt_stats(char *buf, size_t size, void *x)
-{
+static int fmt_stats(char *buf, size_t size, void *x) {
     int whead = 0, wcur = 0;
     Server *s = x;
     struct rusage ru;
@@ -956,58 +864,9 @@ fmt_stats(char *buf, size_t size, void *x)
     }
 
     getrusage(RUSAGE_SELF, &ru); /* don't care if it fails */
-    return snprintf(buf, size, STATS_FMT,
-                    global_stat.urgent_ct,
-                    ready_ct,
-                    global_stat.reserved_ct,
-                    get_delayed_job_ct(),
-                    global_stat.buried_ct,
-                    op_ct[OP_PUT],
-                    op_ct[OP_PEEKJOB],
-                    op_ct[OP_PEEK_READY],
-                    op_ct[OP_PEEK_DELAYED],
-                    op_ct[OP_PEEK_BURIED],
-                    op_ct[OP_RESERVE],
-                    op_ct[OP_RESERVE_TIMEOUT],
-                    op_ct[OP_DELETE],
-                    op_ct[OP_RELEASE],
-                    op_ct[OP_USE],
-                    op_ct[OP_WATCH],
-                    op_ct[OP_IGNORE],
-                    op_ct[OP_BURY],
-                    op_ct[OP_KICK],
-                    op_ct[OP_TOUCH],
-                    op_ct[OP_STATS],
-                    op_ct[OP_STATSJOB],
-                    op_ct[OP_STATS_TUBE],
-                    op_ct[OP_LIST_TUBES],
-                    op_ct[OP_LIST_TUBE_USED],
-                    op_ct[OP_LIST_TUBES_WATCHED],
-                    op_ct[OP_PAUSE_TUBE],
-                    timeout_ct,
-                    global_stat.total_jobs_ct,
-                    job_data_size_limit,
-                    tubes.len,
-                    count_cur_conns(),
-                    count_cur_producers(),
-                    count_cur_workers(),
-                    global_stat.waiting_ct,
-                    count_tot_conns(),
-                    (long) getpid(),
-                    version,
-                    (int) ru.ru_utime.tv_sec, (int) ru.ru_utime.tv_usec,
-                    (int) ru.ru_stime.tv_sec, (int) ru.ru_stime.tv_usec,
-                    uptime(),
-                    whead,
-                    wcur,
-                    s->wal.nmig,
-                    s->wal.nrec,
-                    s->wal.filesize,
-                    drain_mode ? "true" : "false",
-                    instance_hex,
-                    node_info.nodename,
-                    node_info.version,
-                    node_info.machine);
+    return snprintf(buf, size, STATS_FMT, global_stat.urgent_ct, ready_ct, global_stat.reserved_ct, get_delayed_job_ct(), global_stat.buried_ct, op_ct[OP_PUT], op_ct[OP_PEEKJOB], op_ct[OP_PEEK_READY], op_ct[OP_PEEK_DELAYED], op_ct[OP_PEEK_BURIED], op_ct[OP_RESERVE], op_ct[OP_RESERVE_TIMEOUT], op_ct[OP_DELETE], op_ct[OP_RELEASE], op_ct[OP_USE], op_ct[OP_WATCH], op_ct[OP_IGNORE], op_ct[OP_BURY], op_ct[OP_KICK], op_ct[OP_TOUCH], op_ct[OP_STATS], op_ct[OP_STATSJOB], op_ct[OP_STATS_TUBE],
+                    op_ct[OP_LIST_TUBES], op_ct[OP_LIST_TUBE_USED], op_ct[OP_LIST_TUBES_WATCHED], op_ct[OP_PAUSE_TUBE], timeout_ct, global_stat.total_jobs_ct, job_data_size_limit, tubes.len, count_cur_conns(), count_cur_producers(), count_cur_workers(), global_stat.waiting_ct, count_tot_conns(), (long)getpid(), version, (int)ru.ru_utime.tv_sec, (int)ru.ru_utime.tv_usec, (int)ru.ru_stime.tv_sec, (int)ru.ru_stime.tv_usec, uptime(), whead, wcur, s->wal.nmig, s->wal.nrec, s->wal.filesize,
+                    drain_mode ? "true" : "false", instance_hex, node_info.nodename, node_info.version, node_info.machine);
 }
 
 /* Read an integer from the given buffer and place it in num.
@@ -1020,9 +879,7 @@ fmt_stats(char *buf, size_t size, void *x)
  * was consumed and return an error code otherwise.
  * Return 0 on success, or nonzero on failure.
  * If a failure occurs, num and end are not modified. */
-static int
-read_u64(uint64 *num, const char *buf, char **end)
-{
+static int read_u64(uint64 *num, const char *buf, char **end) {
     uintmax_t tnum;
     char *tend;
 
@@ -1041,15 +898,15 @@ read_u64(uint64 *num, const char *buf, char **end)
     if (tnum > UINT64_MAX)
         return -1;
 
-    if (num) *num = (uint64)tnum;
-    if (end) *end = tend;
+    if (num)
+        *num = (uint64)tnum;
+    if (end)
+        *end = tend;
     return 0;
 }
 
 // Indentical to read_u64() but instead reads into uint32.
-static int
-read_u32(uint32 *num, const char *buf, char **end)
-{
+static int read_u32(uint32 *num, const char *buf, char **end) {
     uintmax_t tnum;
     char *tend;
 
@@ -1068,31 +925,29 @@ read_u32(uint32 *num, const char *buf, char **end)
     if (tnum > UINT32_MAX)
         return -1;
 
-    if (num) *num = (uint32)tnum;
-    if (end) *end = tend;
+    if (num)
+        *num = (uint32)tnum;
+    if (end)
+        *end = tend;
     return 0;
 }
 
 /* Read a delay value in seconds from the given buffer and
    place it in duration in nanoseconds.
    The interface and behavior are analogous to read_u32(). */
-static int
-read_duration(int64 *duration, const char *buf, char **end)
-{
+static int read_duration(int64 *duration, const char *buf, char **end) {
     int r;
     uint32 dur_sec;
 
     r = read_u32(&dur_sec, buf, end);
     if (r)
         return r;
-    *duration = ((int64) dur_sec) * 1000000000;
+    *duration = ((int64)dur_sec) * 1000000000;
     return 0;
 }
 
 /* Read a tube name from the given buffer moving the buffer to the name start */
-static int
-read_tube_name(char **tubename, char *buf, char **end)
-{
+static int read_tube_name(char **tubename, char *buf, char **end) {
     size_t len;
 
     while (buf[0] == ' ')
@@ -1107,9 +962,7 @@ read_tube_name(char **tubename, char *buf, char **end)
     return 0;
 }
 
-static void
-wait_for_job(Conn *c, int timeout)
-{
+static void wait_for_job(Conn *c, int timeout) {
     c->state = STATE_WAIT;
     enqueue_waiting_conn(c);
 
@@ -1120,11 +973,9 @@ wait_for_job(Conn *c, int timeout)
     epollq_add(c, 'h');
 }
 
-typedef int(*fmt_fn)(char *, size_t, void *);
+typedef int (*fmt_fn)(char *, size_t, void *);
 
-static void
-do_stats(Conn *c, fmt_fn fmt, void *data)
-{
+static void do_stats(Conn *c, fmt_fn fmt, void *data) {
     int r, stats_len;
 
     /* first, measure how big a buffer we will need */
@@ -1152,9 +1003,7 @@ do_stats(Conn *c, fmt_fn fmt, void *data)
     reply_line(c, STATE_SEND_JOB, "OK %d\r\n", r - 2);
 }
 
-static void
-do_list_tubes(Conn *c, Ms *l)
-{
+static void do_list_tubes(Conn *c, Ms *l) {
     char *buf;
     Tube *t;
     size_t i, resp_z;
@@ -1189,9 +1038,7 @@ do_list_tubes(Conn *c, Ms *l)
     reply_line(c, STATE_SEND_JOB, "OK %zu\r\n", resp_z - 2);
 }
 
-static int
-fmt_job_stats(char *buf, size_t size, Job *j)
-{
+static int fmt_job_stats(char *buf, size_t size, Job *j) {
     int64 t;
     int64 time_left;
     int file = 0;
@@ -1205,26 +1052,10 @@ fmt_job_stats(char *buf, size_t size, Job *j)
     if (j->file) {
         file = j->file->seq;
     }
-    return snprintf(buf, size, STATS_JOB_FMT,
-            j->r.id,
-            j->tube->name,
-            job_state(j),
-            j->r.pri,
-            (t - j->r.created_at) / 1000000000,
-            j->r.delay / 1000000000,
-            j->r.ttr / 1000000000,
-            time_left,
-            file,
-            j->r.reserve_ct,
-            j->r.timeout_ct,
-            j->r.release_ct,
-            j->r.bury_ct,
-            j->r.kick_ct);
+    return snprintf(buf, size, STATS_JOB_FMT, j->r.id, j->tube->name, job_state(j), j->r.pri, (t - j->r.created_at) / 1000000000, j->r.delay / 1000000000, j->r.ttr / 1000000000, time_left, file, j->r.reserve_ct, j->r.timeout_ct, j->r.release_ct, j->r.bury_ct, j->r.kick_ct);
 }
 
-static int
-fmt_stats_tube(char *buf, size_t size, Tube *t)
-{
+static int fmt_stats_tube(char *buf, size_t size, Tube *t) {
     uint64 time_left;
 
     if (t->pause > 0) {
@@ -1232,26 +1063,10 @@ fmt_stats_tube(char *buf, size_t size, Tube *t)
     } else {
         time_left = 0;
     }
-    return snprintf(buf, size, STATS_TUBE_FMT,
-            t->name,
-            t->stat.urgent_ct,
-            t->ready.len,
-            t->stat.reserved_ct,
-            t->delay.len,
-            t->stat.buried_ct,
-            t->stat.total_jobs_ct,
-            t->using_ct,
-            t->watching_ct,
-            t->stat.waiting_ct,
-            t->stat.total_delete_ct,
-            t->stat.pause_ct,
-            t->pause / 1000000000,
-            time_left);
+    return snprintf(buf, size, STATS_TUBE_FMT, t->name, t->stat.urgent_ct, t->ready.len, t->stat.reserved_ct, t->delay.len, t->stat.buried_ct, t->stat.total_jobs_ct, t->using_ct, t->watching_ct, t->stat.waiting_ct, t->stat.total_delete_ct, t->stat.pause_ct, t->pause / 1000000000, time_left);
 }
 
-static void
-maybe_enqueue_incoming_job(Conn *c)
-{
+static void maybe_enqueue_incoming_job(Conn *c) {
     Job *j = c->in_job;
 
     /* do we have a complete job? */
@@ -1265,9 +1080,7 @@ maybe_enqueue_incoming_job(Conn *c)
 }
 
 /* j can be NULL */
-static Job *
-remove_this_reserved_job(Conn *c, Job *j)
-{
+static Job *remove_this_reserved_job(Conn *c, Job *j) {
     j = job_list_remove(j);
     if (j) {
         global_stat.reserved_ct--;
@@ -1278,34 +1091,23 @@ remove_this_reserved_job(Conn *c, Job *j)
     return j;
 }
 
-static Job *
-remove_reserved_job(Conn *c, Job *j)
-{
+static Job *remove_reserved_job(Conn *c, Job *j) {
     if (!is_job_reserved_by_conn(c, j))
         return NULL;
     return remove_this_reserved_job(c, j);
 }
 
-static bool
-is_valid_tube(const char *name, size_t max)
-{
+static bool is_valid_tube(const char *name, size_t max) {
     size_t len = strlen(name);
-    return 0 < len && len <= max &&
-        strspn(name, NAME_CHARS) == len &&
-        name[0] != '-';
+    return 0 < len && len <= max && strspn(name, NAME_CHARS) == len && name[0] != '-';
 }
 
-static bool
-is_vaild_password(const char *pass, size_t max)
-{
+static bool is_vaild_password(const char *pass, size_t max) {
     size_t len = strlen(pass);
-    return 0 < len && len <= max &&
-           strspn(pass, PASSWORD_CHARS) == len;
+    return 0 < len && len <= max && strspn(pass, PASSWORD_CHARS) == len;
 }
 
-static void
-dispatch_cmd(Conn *c)
-{
+static void dispatch_cmd(Conn *c) {
     int r, timeout = -1;
     uint i;
     uint count;
@@ -1338,10 +1140,7 @@ dispatch_cmd(Conn *c)
             c->state = STATE_CLOSE;
             return;
         }
-        if (read_u32(&pri, c->cmd + 4, &delay_buf) ||
-            read_duration(&delay, delay_buf, &ttr_buf) ||
-            read_duration(&ttr, ttr_buf, &size_buf) ||
-            read_u32(&body_size, size_buf, &end_buf)) {
+        if (read_u32(&pri, c->cmd + 4, &delay_buf) || read_duration(&delay, delay_buf, &ttr_buf) || read_duration(&ttr, ttr_buf, &size_buf) || read_u32(&body_size, size_buf, &end_buf)) {
             reply_msg(c, MSG_BAD_FORMAT);
             return;
         }
@@ -1609,9 +1408,7 @@ dispatch_cmd(Conn *c)
             return;
         }
 
-        if (read_u64(&id, c->cmd + CMD_RELEASE_LEN, &pri_buf) ||
-            read_u32(&pri, pri_buf, &delay_buf) ||
-            read_duration(&delay, delay_buf, NULL)) {
+        if (read_u64(&id, c->cmd + CMD_RELEASE_LEN, &pri_buf) || read_u32(&pri, pri_buf, &delay_buf) || read_duration(&delay, delay_buf, NULL)) {
             reply_msg(c, MSG_BAD_FORMAT);
             return;
         }
@@ -1660,8 +1457,7 @@ dispatch_cmd(Conn *c)
             return;
         }
 
-        if (read_u64(&id, c->cmd + CMD_BURY_LEN, &pri_buf) ||
-            read_u32(&pri, pri_buf, NULL)) {
+        if (read_u64(&id, c->cmd + CMD_BURY_LEN, &pri_buf) || read_u32(&pri, pri_buf, NULL)) {
             reply_msg(c, MSG_BAD_FORMAT);
             return;
         }
@@ -1722,8 +1518,7 @@ dispatch_cmd(Conn *c)
             return;
         }
 
-        if ((j->r.state == Buried && kick_buried_job(c->srv, j)) ||
-            (j->r.state == Delayed && kick_delayed_job(c->srv, j))) {
+        if ((j->r.state == Buried && kick_buried_job(c->srv, j)) || (j->r.state == Delayed && kick_delayed_job(c->srv, j))) {
             reply_msg(c, MSG_KICKED);
         } else {
             reply_msg(c, MSG_NOTFOUND);
@@ -1787,7 +1582,7 @@ dispatch_cmd(Conn *c)
             reply_serr(c, MSG_INTERNAL_ERROR);
             return;
         }
-        do_stats(c, (fmt_fn) fmt_job_stats, j);
+        do_stats(c, (fmt_fn)fmt_job_stats, j);
         return;
 
     case OP_STATS_TUBE:
@@ -1808,7 +1603,7 @@ dispatch_cmd(Conn *c)
             reply_msg(c, MSG_NOTFOUND);
             return;
         }
-        do_stats(c, (fmt_fn) fmt_stats_tube, t);
+        do_stats(c, (fmt_fn)fmt_stats_tube, t);
         t = NULL;
         return;
 
@@ -1954,8 +1749,7 @@ dispatch_cmd(Conn *c)
             return;
         }
 
-        if (read_tube_name(&name, c->cmd + CMD_PAUSE_TUBE_LEN, &delay_buf) ||
-            read_duration(&delay, delay_buf, NULL)) {
+        if (read_tube_name(&name, c->cmd + CMD_PAUSE_TUBE_LEN, &delay_buf) || read_duration(&delay, delay_buf, NULL)) {
             reply_msg(c, MSG_BAD_FORMAT);
             return;
         }
@@ -2000,7 +1794,7 @@ dispatch_cmd(Conn *c)
         if (verbose >= 5) {
             printf("<%d AUTH %s\n", c->sock.fd, password);
         }
-        if (strncmp(password, c->srv->password, MAX_PASSWORD_LEN-1) == 0) {
+        if (strncmp(password, c->srv->password, MAX_PASSWORD_LEN - 1) == 0) {
             c->auth = true;
             reply_msg(c, MSG_AUTHORIZED);
         } else {
@@ -2021,9 +1815,7 @@ dispatch_cmd(Conn *c)
  *  3. A waiting client's requested timeout has occurred.
  *
  * If any of these happen, we must do the appropriate thing. */
-static void
-conn_timeout(Conn *c)
-{
+static void conn_timeout(Conn *c) {
     int should_timeout = 0;
     Job *j;
 
@@ -2063,16 +1855,12 @@ conn_timeout(Conn *c)
     }
 }
 
-void
-enter_drain_mode(int sig)
-{
+void enter_drain_mode(int sig) {
     UNUSED_PARAMETER(sig);
     drain_mode = 1;
 }
 
-static void
-conn_want_command(Conn *c)
-{
+static void conn_want_command(Conn *c) {
     epollq_add(c, 'r');
 
     /* was this a peek or stats command? */
@@ -2084,9 +1872,7 @@ conn_want_command(Conn *c)
     c->state = STATE_WANT_COMMAND;
 }
 
-static void
-conn_process_io(Conn *c)
-{
+static void conn_process_io(Conn *c) {
     int r;
     int64 to_read;
     Job *j;
@@ -2178,7 +1964,7 @@ conn_process_io(Conn *c)
     case STATE_WANT_DATA:
         j = c->in_job;
 
-        r = read(c->sock.fd, j->body + c->in_job_read, j->r.body_size -c->in_job_read);
+        r = read(c->sock.fd, j->body + c->in_job_read, j->r.body_size - c->in_job_read);
         if (r == -1) {
             check_err(c, "read()");
             return;
@@ -2195,7 +1981,7 @@ conn_process_io(Conn *c)
         maybe_enqueue_incoming_job(c);
         return;
     case STATE_SEND_WORD:
-        r= write(c->sock.fd, c->reply + c->reply_sent, c->reply_len - c->reply_sent);
+        r = write(c->sock.fd, c->reply + c->reply_sent, c->reply_len - c->reply_sent);
         if (r == -1) {
             check_err(c, "write()");
             return;
@@ -2246,7 +2032,7 @@ conn_process_io(Conn *c)
         /* are we done? */
         if (c->out_job_sent == j->r.body_size) {
             if (verbose >= 2) {
-                printf(">%d job %"PRIu64"\n", c->sock.fd, j->r.id);
+                printf(">%d job %" PRIu64 "\n", c->sock.fd, j->r.id);
             }
             conn_want_command(c);
             return;
@@ -2265,12 +2051,10 @@ conn_process_io(Conn *c)
     }
 }
 
-#define want_command(c) ((c)->sock.fd && ((c)->state == STATE_WANT_COMMAND))
+#define want_command(c)   ((c)->sock.fd && ((c)->state == STATE_WANT_COMMAND))
 #define cmd_data_ready(c) (want_command(c) && (c)->cmd_read)
 
-static void
-h_conn(const int fd, const short which, Conn *c)
-{
+static void h_conn(const int fd, const short which, Conn *c) {
     if (fd != c->sock.fd) {
         twarnx("Argh! event fd doesn't match conn fd.");
         close(fd);
@@ -2295,16 +2079,12 @@ h_conn(const int fd, const short which, Conn *c)
     epollq_apply();
 }
 
-static void
-prothandle(Conn *c, int ev)
-{
+static void prothandle(Conn *c, int ev) {
     h_conn(c->sock.fd, ev, c);
 }
 
 // prottick returns nanoseconds till the next work.
-int64
-prottick(Server *s)
-{
+int64 prottick(Server *s) {
     Job *j;
     int64 now;
     Tube *t;
@@ -2324,7 +2104,7 @@ prottick(Server *s)
         heapremove(&j->tube->delay, j->heap_index);
         int r = enqueue_job(s, j, 0, 0);
         if (r < 1)
-            bury_job(s, j, 0);  /* out of memory */
+            bury_job(s, j, 0); /* out of memory */
     }
 
     // Unpause every possible tube and process the queue.
@@ -2336,8 +2116,7 @@ prottick(Server *s)
         if (t->pause && d <= 0) {
             t->pause = 0;
             process_queue();
-        }
-        else if (d > 0) {
+        } else if (d > 0) {
             period = min(period, d);
         }
     }
@@ -2361,16 +2140,15 @@ prottick(Server *s)
     return period;
 }
 
-void
-h_accept(const int fd, const short which, Server *s)
-{
+void h_accept(const int fd, const short which, Server *s) {
     UNUSED_PARAMETER(which);
     struct sockaddr_storage addr;
 
     socklen_t addrlen = sizeof addr;
     int cfd = accept(fd, (struct sockaddr *)&addr, &addrlen);
     if (cfd == -1) {
-        if (errno != EAGAIN && errno != EWOULDBLOCK) twarn("accept()");
+        if (errno != EAGAIN && errno != EWOULDBLOCK)
+            twarn("accept()");
         epollq_apply();
         return;
     }
@@ -2432,9 +2210,7 @@ h_accept(const int fd, const short which, Server *s)
     epollq_apply();
 }
 
-void
-prot_init()
-{
+void prot_init() {
     started_at = nanoseconds();
     memset(op_ct, 0, sizeof(op_ct));
 
@@ -2472,14 +2248,12 @@ prot_init()
 // structures and adds it to the log.
 //
 // Returns 1 on success, 0 on failure.
-int
-prot_replay(Server *s, Job *list)
-{
+int prot_replay(Server *s, Job *list) {
     Job *j, *nj;
     int64 t;
     int r;
 
-    for (j = list->next ; j != list ; j = nj) {
+    for (j = list->next; j != list; j = nj) {
         nj = j->next;
         job_list_remove(j);
         int z = walresvupdate(&s->wal);
@@ -2502,7 +2276,7 @@ prot_replay(Server *s, Job *list)
         default:
             r = enqueue_job(s, j, delay, 0);
             if (r < 1)
-                twarnx("error recovering job %"PRIu64, j->r.id);
+                twarnx("error recovering job %" PRIu64, j->r.id);
         }
     }
     return 1;
