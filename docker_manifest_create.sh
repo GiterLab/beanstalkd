@@ -18,7 +18,7 @@
 # The manifest file is used to specify the architecture of the docker image.
 
 # usage:
-# ./manifest_create.sh [IMAGE]
+# ./docker_manifest_create.sh [IMAGE]
 
 IMAGE=$1
 ISPUSH=$2
@@ -48,7 +48,15 @@ for arch in $LINUX_ARCH; do
 done
 
 # create the manifest file
+# if the manifest file already exists, remove it
 echo "Creating the manifest file for the image $IMAGE"
+if docker manifest inspect $IMAGE_TO > /dev/null 2>&1; then
+    docker manifest rm $IMAGE_TO
+    if [ $? -ne 0 ]; then
+        echo "Failed to remove the existing manifest file"
+        exit 1
+    fi
+fi
 docker manifest create $IMAGE $IMAGE-amd64 $IMAGE-arm64
 if [ $? -ne 0 ]; then
     echo "Failed to create the manifest file"
